@@ -75,8 +75,7 @@ resource "yandex_kubernetes_node_group" "main" {
 
   allocation_policy {
     location {
-      zone      = var.yc_zone
-      subnet_id = yandex_vpc_subnet.main.id
+      zone = var.yc_zone
     }
   }
 }
