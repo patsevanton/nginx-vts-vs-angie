@@ -1,0 +1,61 @@
+#cloud-config
+users:
+  - name: ubuntu
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    shell: /bin/bash
+    ssh_authorized_keys:
+      - ${ssh_public_key}
+
+package_update: true
+package_upgrade: true
+
+packages:
+  - docker.io
+  - docker-compose-plugin
+  - curl
+  - wget
+
+write_files:
+  - path: /opt/loadgen/run.sh
+    permissions: '0755'
+    content: |
+      #!/bin/bash
+      # Install hey for HTTP load generation
+      wget -q https://hey-release.s3.us-east-2.amazonaws.com/hey_linux_amd64 -O /usr/local/bin/hey
+      chmod +x /usr/local/bin/hey
+
+      echo "Load generator ready. Use:"
+      echo "  hey -z 300s -c 100 -q 1000 http://<NLB_IP>/"
+      echo ""
+      echo "Targets:"
+      echo "  Nginx VTS NLB: will be configured"
+      echo "  Angie NLB: will be configured"
+
+  - path: /opt/loadgen/stress.sh
+    permissions: '0755'
+    content: |
+      #!/bin/bash
+      # Stress test both backends simultaneously
+      if [ -z "$1" ] || [ -z "$2" ]; then
+        echo "Usage: $0 <nginx_vts_nlb_ip> <angie_nlb_ip>"
+        exit 1
+      fi
+
+      NGINX_VTS_IP=$1
+      ANGIE_IP=$2
+
+      echo "Starting stress test against nginx-vts ($NGINX_VTS_IP) and angie ($ANGIE_IP)..."
+
+      # Run in parallel
+      hey -z 600s -c 200 -q 500 http://$NGINX_VTS_IP/ &
+      PID1=$!
+      hey -z 600s -c 200 -q 500 http://$ANGIE_IP/ &
+      PID2=$!
+
+      wait $PID1 $PID2
+      echo "Stress test completed."
+
+runcmd:
+  - wget -q https://hey-release.s3.us-east-2.amazonaws.com/hey_linux_amd64 -O /usr/local/bin/hey
+  - chmod +x /usr/local/bin/hey
+  - echo "Load generator VM ready"

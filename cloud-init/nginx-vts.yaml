@@ -1,0 +1,155 @@
+#cloud-config
+users:
+  - name: ubuntu
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    shell: /bin/bash
+    ssh_authorized_keys:
+      - ${ssh_public_key}
+
+package_update: true
+package_upgrade: true
+
+packages:
+  - docker.io
+  - docker-compose-plugin
+  - curl
+  - wget
+
+write_files:
+  - path: /opt/nginx-vts/docker-compose.yml
+    content: |
+      version: "3.8"
+
+      services:
+        nginx-vts:
+          image: nginx:latest
+          container_name: nginx-vts
+          ports:
+            - "80:80"
+          volumes:
+            - ./nginx.conf:/etc/nginx/nginx.conf:ro
+            - ./html:/usr/share/nginx/html:ro
+          restart: unless-stopped
+
+        vector:
+          image: timberio/vector:0.42.0-debian
+          container_name: vector
+          volumes:
+            - ./vector.yaml:/etc/vector/vector.yaml:ro
+            - /var/run/docker.sock:/var/run/docker.sock:ro
+          environment:
+            - VECTOR_LOG=info
+          ports:
+            - "9598:9598"
+          depends_on:
+            - nginx-vts
+          restart: unless-stopped
+
+  - path: /opt/nginx-vts/nginx.conf
+    content: |
+      worker_processes auto;
+      error_log /var/log/nginx/error.log warn;
+      pid /var/run/nginx.pid;
+
+      events {
+          worker_connections 4096;
+          multi_accept on;
+      }
+
+      http {
+          include       /etc/nginx/mime.types;
+          default_type  application/octet-stream;
+
+          log_format json_combined escape=json
+          '{'
+            '"time":"$$time_iso8601",'
+            '"remote_addr":"$$remote_addr",'
+            '"request":"$$request",'
+            '"status":$$status,'
+            '"body_bytes_sent":$$body_bytes_sent,'
+            '"request_time":$$request_time,'
+            '"http_referrer":"$$http_referer",'
+            '"http_user_agent":"$$http_user_agent",'
+            '"upstream_addr":"$$upstream_addr",'
+            '"upstream_response_time":"$$upstream_response_time"'
+          '}';
+
+          access_log /var/log/nginx/access.log json_combined;
+
+          sendfile on;
+          tcp_nopush on;
+          tcp_nodelay on;
+          keepalive_timeout 65;
+          types_hash_max_size 2048;
+
+          server {
+              listen 80;
+              server_name _;
+
+              location / {
+                  root /usr/share/nginx/html;
+                  index index.html;
+              }
+
+              location /status {
+                  stub_status on;
+                  access_log off;
+              }
+
+              location /health {
+                  return 200 'ok';
+                  add_header Content-Type text/plain;
+              }
+          }
+      }
+
+  - path: /opt/nginx-vts/html/index.html
+    content: |
+      <!DOCTYPE html>
+      <html>
+      <head><title>nginx-vts-bench</title></head>
+      <body><h1>nginx-vts benchmark target</h1></body>
+      </html>
+
+  - path: /opt/nginx-vts/vector.yaml
+    content: |
+      data_dir: /var/lib/vector
+
+      sources:
+        docker_logs:
+          type: docker_logs
+          docker_host: unix:///var/run/docker.sock
+
+      transforms:
+        parse_nginx:
+          type: remap
+          inputs:
+            - docker_logs
+          source: |
+            . = parse_json!(.message)
+            .source = "nginx-vts"
+
+      sinks:
+        victorialogs:
+          type: http
+          inputs:
+            - parse_nginx
+          uri: "http://${victorialogs_endpoint}/insert/jsonline?_msg_field=message&_time_field=time&_stream_fields=source"
+          encoding:
+            codec: json
+          method: post
+          healthcheck:
+            enabled: false
+
+        prometheus_metrics:
+          type: prometheus_exporter
+          inputs:
+            - docker_logs
+          address: "0.0.0.0:9598"
+
+runcmd:
+  - systemctl enable docker
+  - systemctl start docker
+  - sleep 5
+  - cd /opt/nginx-vts && docker compose up -d
+  - echo "nginx-vts with vector started"

@@ -1,0 +1,171 @@
+#cloud-config
+users:
+  - name: ubuntu
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    shell: /bin/bash
+    ssh_authorized_keys:
+      - ${ssh_public_key}
+
+package_update: true
+package_upgrade: true
+
+packages:
+  - curl
+  - wget
+  - gnupg2
+  - lsb-release
+  - ca-certificates
+  - apt-transport-https
+
+write_files:
+  - path: /etc/angie/angie.conf
+    content: |
+      worker_processes auto;
+      error_log /var/log/angie/error.log warn;
+      pid /run/angie.pid;
+
+      events {
+          worker_connections 4096;
+          multi_accept on;
+      }
+
+      http {
+          include       /etc/angie/mime.types;
+          default_type  application/octet-stream;
+
+          log_format json_combined escape=json
+          '{'
+            '"time":"$$time_iso8601",'
+            '"remote_addr":"$$remote_addr",'
+            '"request":"$$request",'
+            '"status":$$status,'
+            '"body_bytes_sent":$$body_bytes_sent,'
+            '"request_time":$$request_time,'
+            '"http_referrer":"$$http_referer",'
+            '"http_user_agent":"$$http_user_agent"'
+          '}';
+
+          access_log /var/log/angie/access.log json_combined;
+
+          sendfile on;
+          tcp_nopush on;
+          tcp_nodelay on;
+          keepalive_timeout 65;
+          types_hash_max_size 2048;
+
+          server {
+              listen 80;
+              server_name _;
+
+              location / {
+                  root /var/www/angie;
+                  index index.html;
+              }
+
+              location /status {
+                  api /status/format/json;
+              }
+
+              location /health {
+                  return 200 'ok';
+                  add_header Content-Type text/plain;
+              }
+          }
+      }
+
+  - path: /var/www/angie/index.html
+    content: |
+      <!DOCTYPE html>
+      <html>
+      <head><title>angie-bench</title></head>
+      <body><h1>Angie benchmark target</h1></body>
+      </html>
+
+  - path: /opt/angie/vector.yaml
+    content: |
+      data_dir: /var/lib/vector
+
+      sources:
+        angie_logs:
+          type: file
+          include:
+            - /var/log/angie/access.log
+          read_from: end
+
+        angie_error_logs:
+          type: file
+          include:
+            - /var/log/angie/error.log
+          read_from: end
+
+      transforms:
+        parse_access:
+          type: remap
+          inputs:
+            - angie_logs
+          source: |
+            . = parse_json!(.message)
+            .source = "angie"
+            .log_type = "access"
+
+      sinks:
+        victorialogs:
+          type: http
+          inputs:
+            - parse_access
+            - angie_error_logs
+          uri: "http://${victorialogs_endpoint}/insert/jsonline?_msg_field=message&_time_field=time&_stream_fields=source"
+          encoding:
+            codec: json
+          method: post
+          healthcheck:
+            enabled: false
+
+        prometheus_metrics:
+          type: prometheus_exporter
+          inputs:
+            - angie_logs
+            - angie_error_logs
+          address: "0.0.0.0:9598"
+
+  - path: /opt/angie/install-angie.sh
+    permissions: '0755'
+    content: |
+      #!/bin/bash
+      set -e
+
+      wget -qO - http://download.angie.software/keys/angie-signing.gpg | gpg --dearmor -o /usr/share/keyrings/angie-archive-keyring.gpg
+
+      echo "deb [signed-by=/usr/share/keyrings/angie-archive-keyring.gpg] http://download.angie.software/$(lsb_release -is | tr '[:upper:]' '[:lower:]')/ $(lsb_release -cs) main" \
+        > /etc/apt/sources.list.d/angie.list
+
+      apt-get update
+      apt-get install -y angie
+
+  - path: /opt/angie/install-vector.sh
+    permissions: '0755'
+    content: |
+      #!/bin/bash
+      set -e
+
+      curl -1sLf 'https://repositories.timber.io/public/vector/gpg.3543DB2D0A2BC4B8.key' | gpg --dearmor -o /usr/share/keyrings/timber-io-vector-archive-keyring.gpg
+
+      echo "deb [signed-by=/usr/share/keyrings/timber-io-vector-archive-keyring.gpg] https://repositories.timber.io/public/vector/deb/ubuntu $(lsb_release -cs) main" \
+        > /etc/apt/sources.list.d/timber-vector.list
+
+      apt-get update
+      apt-get install -y vector
+
+runcmd:
+  - bash /opt/angie/install-angie.sh
+  - mkdir -p /var/www/angie
+  - cp /opt/angie/index.html /var/www/angie/index.html
+  - systemctl enable angie
+  - systemctl start angie
+
+  - bash /opt/angie/install-vector.sh
+  - cp /opt/angie/vector.yaml /etc/vector/vector.yaml
+  - systemctl enable vector
+  - systemctl start vector
+
+  - echo "Angie with vector started"
