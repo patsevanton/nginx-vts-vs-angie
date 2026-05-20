@@ -1,0 +1,22 @@
+vlselect:
+  vmServiceScrape:
+    enabled: true
+  ingress:
+    enabled: true
+    hosts:
+      - name: victorialogs.apatsev.org.ru
+        path:
+          - /
+        port: http
+    ingressClassName: nginx
+
+vlinsert:
+  vmServiceScrape:
+    enabled: true
+
+vlstorage:
+  vmServiceScrape:
+    enabled: true
+  retentionPeriod: 1d
+  persistentVolume:
+    size: 20Gi

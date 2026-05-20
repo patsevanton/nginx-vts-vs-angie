@@ -1,0 +1,53 @@
+# --- Grafana ---
+grafana:
+  # Плагины: лог-датасорс VictoriaLogs и датасорс Chaos Mesh
+  plugins:
+    - victoriametrics-logs-datasource 0.24.0
+    - chaosmeshorg-datasource 3.0.0
+  # Логи в JSON для удобного парсинга (например, в Loki/VictoriaLogs)
+  env:
+    GF_LOG_MODE: console
+    GF_LOG_CONSOLE_FORMAT: json
+  # Ingress для доступа к Grafana (nginx, без принудительного HTTPS)
+  ingress:
+    ingressClassName: nginx
+    enabled: true
+    hosts:
+      - grafana.apatsev.org.ru
+    annotations:
+      nginx.ingress.kubernetes.io/ssl-redirect: "false"
+
+# --- Источники данных по умолчанию ---
+defaultDatasources:
+  extra:
+    # VictoriaLogs - запросы к логам (vlselect)
+    - name: victoriametrics-logs
+      access: proxy
+      type: victoriametrics-logs-datasource
+      url: http://victoria-logs-cluster-vlselect.victoria-logs-cluster.svc.cluster.local:9471
+      jsonData:
+        maxLines: 1000
+      version: 1
+    # Chaos Mesh - дашборд и эксперименты
+    - name: Chaos Mesh
+      access: proxy
+      type: chaosmeshorg-datasource
+      url: http://chaos-dashboard.chaos-mesh.svc.cluster.local:2333
+      version: 1
+
+# --- VictoriaMetrics: single-node отключён, используем cluster ---
+vmsingle:
+  enabled: false
+
+# --- VictoriaMetrics cluster (vminsert/vmselect/vmstorage) ---
+vmcluster:
+  enabled: true
+  # Ingress для vmselect (Prometheus-совместимый API метрик)
+  ingress:
+    select:
+      enabled: true
+      ingressClassName: nginx
+      annotations:
+        nginx.ingress.kubernetes.io/ssl-redirect: "false"
+      hosts:
+        - vmselect.apatsev.org.ru

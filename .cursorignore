@@ -1,0 +1,8 @@
+.cursorignore
+.git
+.gitignore
+.terraform
+.terraform.lock.hcl
+LICENSE
+terraform.tfstate
+terraform.tfstate.backup
