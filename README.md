@@ -85,7 +85,3 @@ helm upgrade --install victoria-logs-collector vm/victoria-logs-collector \
   --timeout 15m \
   -f victoria-logs-collector-values.yaml
 ```
-
-## Лицензия
-
-См. [LICENSE](LICENSE).
