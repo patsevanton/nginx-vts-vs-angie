@@ -18,15 +18,15 @@ resource "time_sleep" "wait_sa" {
   ]
 }
 
-resource "yandex_kubernetes_cluster" "strimzi" {
-  name       = "strimzi"
-  network_id = yandex_vpc_network.strimzi.id
+resource "yandex_kubernetes_cluster" "nginx-vts-vs-angie" {
+  name       = "nginx-vts-vs-angie"
+  network_id = yandex_vpc_network.nginx-vts-vs-angie.id
 
   master {
     version = "1.32"
     zonal {
-      zone      = yandex_vpc_subnet.strimzi-a.zone
-      subnet_id = yandex_vpc_subnet.strimzi-a.id
+      zone      = yandex_vpc_subnet.nginx-vts-vs-angie-a.zone
+      subnet_id = yandex_vpc_subnet.nginx-vts-vs-angie-a.id
     }
 
     public_ip = true
@@ -43,7 +43,7 @@ resource "yandex_kubernetes_cluster" "strimzi" {
 resource "yandex_kubernetes_node_group" "k8s-node-group" {
   description = "Node group for the Managed Service for Kubernetes cluster"
   name        = "k8s-node-group"
-  cluster_id  = yandex_kubernetes_cluster.strimzi.id
+  cluster_id  = yandex_kubernetes_cluster.nginx-vts-vs-angie.id
   version     = "1.32"
 
   # 6 нод: равномернее распределение 50 prod + 50 cons, допустимые memory/cores для standard-v2.
@@ -54,9 +54,9 @@ resource "yandex_kubernetes_node_group" "k8s-node-group" {
   }
 
   allocation_policy {
-    location { zone = yandex_vpc_subnet.strimzi-a.zone }
-    location { zone = yandex_vpc_subnet.strimzi-b.zone }
-    location { zone = yandex_vpc_subnet.strimzi-d.zone }
+    location { zone = yandex_vpc_subnet.nginx-vts-vs-angie-a.zone }
+    location { zone = yandex_vpc_subnet.nginx-vts-vs-angie-b.zone }
+    location { zone = yandex_vpc_subnet.nginx-vts-vs-angie-d.zone }
   }
 
   instance_template {
@@ -65,9 +65,9 @@ resource "yandex_kubernetes_node_group" "k8s-node-group" {
     network_interface {
       nat = true
       subnet_ids = [
-        yandex_vpc_subnet.strimzi-a.id,
-        yandex_vpc_subnet.strimzi-b.id,
-        yandex_vpc_subnet.strimzi-d.id
+        yandex_vpc_subnet.nginx-vts-vs-angie-a.id,
+        yandex_vpc_subnet.nginx-vts-vs-angie-b.id,
+        yandex_vpc_subnet.nginx-vts-vs-angie-d.id
       ]
     }
 
@@ -87,8 +87,8 @@ resource "yandex_kubernetes_node_group" "k8s-node-group" {
 
 provider "helm" {
   kubernetes = {
-    host                   = yandex_kubernetes_cluster.strimzi.master[0].external_v4_endpoint
-    cluster_ca_certificate = yandex_kubernetes_cluster.strimzi.master[0].cluster_ca_certificate
+    host                   = yandex_kubernetes_cluster.nginx-vts-vs-angie.master[0].external_v4_endpoint
+    cluster_ca_certificate = yandex_kubernetes_cluster.nginx-vts-vs-angie.master[0].cluster_ca_certificate
 
     exec = {
       api_version = "client.authentication.k8s.io/v1beta1"
@@ -106,7 +106,7 @@ resource "helm_release" "ingress_nginx" {
   create_namespace = true
 
   depends_on = [
-    yandex_kubernetes_cluster.strimzi
+    yandex_kubernetes_cluster.nginx-vts-vs-angie
   ]
 
   values = [
@@ -128,5 +128,5 @@ resource "helm_release" "ingress_nginx" {
 }
 
 output "k8s_cluster_credentials_command" {
-  value = "yc managed-kubernetes cluster get-credentials --id ${yandex_kubernetes_cluster.strimzi.id} --external --force"
+  value = "yc managed-kubernetes cluster get-credentials --id ${yandex_kubernetes_cluster.nginx-vts-vs-angie.id} --external --force"
 }

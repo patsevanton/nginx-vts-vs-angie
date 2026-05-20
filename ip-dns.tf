@@ -2,7 +2,7 @@ resource "yandex_vpc_address" "addr" {
   name = "victorialogs-pip"
 
   external_ipv4_address {
-    zone_id = yandex_vpc_subnet.strimzi-a.zone
+    zone_id = yandex_vpc_subnet.nginx-vts-vs-angie-a.zone
   }
 }
 
@@ -12,7 +12,7 @@ resource "yandex_dns_zone" "apatsev-org-ru" {
   zone   = "apatsev.org.ru."
   public = true
 
-  private_networks = [yandex_vpc_network.strimzi.id]
+  private_networks = [yandex_vpc_network.nginx-vts-vs-angie.id]
 }
 
 resource "yandex_dns_recordset" "grafana" {
