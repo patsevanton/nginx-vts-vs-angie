@@ -2,7 +2,7 @@
 grafana:
   # Плагины: лог-датасорс VictoriaLogs
   plugins:
-    - victoriametrics-logs-datasource 0.27.1
+    - victoriametrics-logs-datasource 0.26.3
   # Логи в JSON для удобного парсинга (например, в Loki/VictoriaLogs)
   env:
     GF_LOG_MODE: console
