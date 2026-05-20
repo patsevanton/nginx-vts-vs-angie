@@ -56,7 +56,7 @@ resource "helm_release" "victoria_metrics" {
 resource "helm_release" "victoria_logs" {
   name             = "victoria-logs"
   repository       = "https://victoriametrics.github.io/helm-charts/"
-  chart            = "victoria-logs-k8s-stack"
+  chart            = "victoria-logs-single"
   namespace        = "logging"
   create_namespace = true
 
