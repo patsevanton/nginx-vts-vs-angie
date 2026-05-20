@@ -28,19 +28,13 @@ defaultDatasources:
         maxLines: 1000
       version: 1
 
-# --- VictoriaMetrics: single-node отключён, используем cluster ---
+# --- VictoriaMetrics: single-node ---
 vmsingle:
-  enabled: false
-
-# --- VictoriaMetrics cluster (vminsert/vmselect/vmstorage) ---
-vmcluster:
   enabled: true
-  # Ingress для vmselect (Prometheus-совместимый API метрик)
   ingress:
-    select:
-      enabled: true
-      ingressClassName: nginx
-      annotations:
-        nginx.ingress.kubernetes.io/ssl-redirect: "false"
-      hosts:
-        - vmselect.apatsev.org.ru
+    enabled: true
+    ingressClassName: nginx
+    annotations:
+      nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    hosts:
+      - vmselect.apatsev.org.ru
