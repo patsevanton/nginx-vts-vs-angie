@@ -51,7 +51,7 @@ helm upgrade --install vmks \
   --namespace vmks \
   --create-namespace \
   --wait \
-  --version 0.70.0 \
+  --version 0.79.1 \
   --timeout 15m \
   -f victoriametrics-values.yaml
 ```
@@ -69,7 +69,7 @@ helm upgrade --install victoria-logs-cluster vm/victoria-logs-cluster \
   --namespace victoria-logs-cluster \
   --create-namespace \
   --wait \
-  --version 0.0.27 \
+  --version 0.1.4 \
   --timeout 15m \
   -f victoria-logs-cluster-values.yaml
 ```
@@ -81,7 +81,7 @@ helm upgrade --install victoria-logs-collector vm/victoria-logs-collector \
   --namespace victoria-logs-collector \
   --create-namespace \
   --wait \
-  --version 0.2.9 \
+  --version 0.3.3 \
   --timeout 15m \
   -f victoria-logs-collector-values.yaml
 ```
