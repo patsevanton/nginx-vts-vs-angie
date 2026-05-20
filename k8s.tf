@@ -60,7 +60,9 @@ resource "yandex_kubernetes_node_group" "k8s-node-group" {
 
   instance_template {
     platform_id = "standard-v2"
-    preemptible = true
+    scheduling_policy {
+      preemptible = true
+    }
 
     network_interface {
       nat = true
