@@ -1,0 +1,135 @@
+#cloud-config
+package_update: true
+package_upgrade: true
+packages:
+  - apt-transport-https
+  - ca-certificates
+  - curl
+  - gnupg
+  - lsb-release
+  - jq
+
+write_files:
+  - path: /etc/angie/nginx.conf
+    content: |
+      worker_processes auto;
+      error_log /var/log/angie/error.log warn;
+      pid /var/run/angie.pid;
+
+      events {
+          worker_connections 1024;
+      }
+
+      http {
+          include       /etc/angie/mime.types;
+          default_type  application/octet-stream;
+
+          log_format json_combined escape=json
+              '{'
+                  '"ts":"$time_iso8601",'
+                  '"remote_addr":"$remote_addr",'
+                  '"request_method":"$request_method",'
+                  '"request_uri":"$request_uri",'
+                  '"status":$status,'
+                  '"body_bytes_sent":$body_bytes_sent,'
+                  '"request_time":$request_time,'
+                  '"upstream_response_time":"$upstream_response_time",'
+                  '"upstream_addr":"$upstream_addr",'
+                  '"http_user_agent":"$http_user_agent",'
+                  '"http_host":"$http_host",'
+                  '"server_protocol":"$server_protocol",'
+                  '"request_length":$request_length,'
+                  '"bytes_sent":$bytes_sent
+              '}';
+
+          access_log /var/log/angie/access.log json_combined;
+
+          server {
+              listen 80;
+              server_name _;
+
+              location / {
+                  proxy_pass http://${backend_addr};
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Request-ID $request_id;
+              }
+
+              location /api/ {
+                  api write=off;
+              }
+
+              location /status.html {
+                  stub_status;
+              }
+          }
+      }
+    permissions: "0644"
+
+  - path: /etc/vector/vector.toml
+    content: |
+      data_dir = "/var/lib/vector"
+
+      [sources.angie_access]
+      type = "file"
+      include = ["/var/log/angie/access.log"]
+      read_from = "end"
+
+      [sources.angie_error]
+      type = "file"
+      include = ["/var/log/angie/error.log"]
+      read_from = "end"
+
+      [transforms.parse_access]
+      type = "remap"
+      inputs = ["angie_access"]
+      source = '''
+      . = parse_json!(.message)
+      '''
+
+      [transforms.parse_error]
+      type = "remap"
+      inputs = ["angie_error"]
+      source = '''
+      . |= parse_json(.message) ?? { "msg": .message }
+      '''
+
+      [sinks.victorialogs_access]
+      type = "http"
+      inputs = ["parse_access"]
+      uri = "http://${vlinsert_addr}/insert/jsonline?_stream_fields=instance,_msg_field=msg&_time_field=ts"
+      method = "post"
+      encoding.codec = "json"
+      healthcheck.enabled = false
+
+      [sinks.victorialogs_error]
+      type = "http"
+      inputs = ["parse_error"]
+      uri = "http://${vlinsert_addr}/insert/jsonline?_stream_fields=instance,_msg_field=msg&_time_field=ts"
+      method = "post"
+      encoding.codec = "json"
+      healthcheck.enabled = false
+
+      [sources.vector_metrics]
+      type = "internal_metrics"
+
+      [sinks.vector_metrics_export]
+      type = "prometheus_exporter"
+      inputs = ["vector_metrics"]
+      address = "0.0.0.0:9598"
+    permissions: "0644"
+
+runcmd:
+  - curl -fsSL https://download.angie.software/keys/angie-signing.gpg | gpg --dearmor -o /usr/share/keyrings/angie.gpg
+  - echo "deb [signed-by=/usr/share/keyrings/angie.gpg] https://download.angie.software/angie/$(lsb_release -sc)/ $(lsb_release -sc) main" > /etc/apt/sources.list.d/angie.list
+  - echo -e "Package: *\nPin: origin download.angie.software\nPin-Priority: 900" > /etc/apt/preferences.d/angie
+  - apt-get update
+  - apt-get install -y angie angie-module-sticky
+  - mkdir -p /var/log/angie
+  - systemctl enable angie
+  - systemctl start angie
+  - curl -1sLf 'https://repositories.timber.io/public/vector/gpg.3543DB2D0A2BC4B8.key' | gpg --dearmor -o /usr/share/keyrings/vector-archive-keyring.gpg
+  - echo "deb [signed-by=/usr/share/keyrings/vector-archive-keyring.gpg] https://repositories.timber.io/public/vector/deb/ubuntu $(lsb_release -cs) main" > /etc/apt/sources.list.d/vector.list
+  - apt-get update && apt-get install -y vector
+  - systemctl enable vector
+  - systemctl start vector

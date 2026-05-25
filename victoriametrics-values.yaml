@@ -1,13 +1,9 @@
-# --- Grafana ---
 grafana:
-  # Плагины: лог-датасорс VictoriaLogs
   plugins:
     - victoriametrics-logs-datasource
-  # Логи в JSON для удобного парсинга (например, в Loki/VictoriaLogs)
   env:
     GF_LOG_MODE: console
     GF_LOG_CONSOLE_FORMAT: json
-  # Ingress для доступа к Grafana (nginx, без принудительного HTTPS)
   ingress:
     ingressClassName: nginx
     enabled: true
@@ -16,10 +12,8 @@ grafana:
     annotations:
       nginx.ingress.kubernetes.io/ssl-redirect: "false"
 
-# --- Источники данных по умолчанию ---
 defaultDatasources:
   extra:
-    # VictoriaLogs - запросы к логам (vlselect)
     - name: victoriametrics-logs
       access: proxy
       type: victoriametrics-logs-datasource
@@ -28,7 +22,6 @@ defaultDatasources:
         maxLines: 1000
       version: 1
 
-# --- VictoriaMetrics: single-node ---
 vmsingle:
   enabled: true
   ingress:
@@ -38,3 +31,6 @@ vmsingle:
       nginx.ingress.kubernetes.io/ssl-redirect: "false"
     hosts:
       - vmselect.apatsev.org.ru
+
+vmagent:
+  enabled: true

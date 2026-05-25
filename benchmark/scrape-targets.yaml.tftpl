@@ -1,0 +1,54 @@
+vmagent:
+  enabled: true
+  spec:
+    externalLabels:
+      cluster: nginx-vts-vs-angie
+    additionalScrapeConfigs:
+      - job_name: "nginx-vts-exporter-docker"
+        scrape_interval: 15s
+        static_configs:
+          - targets: ["${nginx_vts_docker_ip}:9913"]
+            labels:
+              variant: "nginx-vts-docker"
+              instance: "nginx-vts-docker"
+        metrics_path: /metrics
+      - job_name: "nginx-vts-exporter"
+        scrape_interval: 15s
+        static_configs:
+          - targets: ["${nginx_vts_ip}:9913"]
+            labels:
+              variant: "nginx-vts"
+              instance: "nginx-vts"
+        metrics_path: /metrics
+      - job_name: "angie-api"
+        scrape_interval: 15s
+        static_configs:
+          - targets: ["${angie_ip}:80"]
+            labels:
+              variant: "angie"
+              instance: "angie"
+        metrics_path: /api/status/format/prometheus
+      - job_name: "vector-metrics-docker"
+        scrape_interval: 15s
+        static_configs:
+          - targets: ["${nginx_vts_docker_ip}:9598"]
+            labels:
+              variant: "nginx-vts-docker"
+              component: "vector"
+        metrics_path: /metrics
+      - job_name: "vector-metrics-nginx-vts"
+        scrape_interval: 15s
+        static_configs:
+          - targets: ["${nginx_vts_ip}:9598"]
+            labels:
+              variant: "nginx-vts"
+              component: "vector"
+        metrics_path: /metrics
+      - job_name: "vector-metrics-angie"
+        scrape_interval: 15s
+        static_configs:
+          - targets: ["${angie_ip}:9598"]
+            labels:
+              variant: "angie"
+              component: "vector"
+        metrics_path: /metrics

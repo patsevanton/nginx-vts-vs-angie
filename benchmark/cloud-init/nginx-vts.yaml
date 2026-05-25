@@ -1,0 +1,210 @@
+#cloud-config
+package_update: true
+package_upgrade: true
+packages:
+  - build-essential
+  - libpcre3-dev
+  - zlib1g-dev
+  - libssl-dev
+  - wget
+  - git
+  - jq
+
+write_files:
+  - path: /tmp/build-nginx-vts.sh
+    content: |
+      #!/bin/bash
+      set -e
+      cd /tmp
+      wget -q https://nginx.org/download/nginx-1.27.4.tar.gz
+      tar xzf nginx-1.27.4.tar.gz
+      git clone --depth 1 --branch v0.2.2 https://github.com/vozlt/nginx-module-vts.git
+      cd nginx-1.27.4
+      ./configure \
+        --prefix=/etc/nginx \
+        --sbin-path=/usr/sbin/nginx \
+        --modules-path=/usr/lib/nginx/modules \
+        --conf-path=/etc/nginx/nginx.conf \
+        --error-log-path=/var/log/nginx/error.log \
+        --http-log-path=/var/log/nginx/access.log \
+        --pid-path=/var/run/nginx.pid \
+        --with-http_ssl_module \
+        --with-http_stub_status_module \
+        --with-compat \
+        --add-dynamic-module=/tmp/nginx-module-vts
+      make -j$(nproc)
+      make install
+      mkdir -p /usr/lib/nginx/modules
+      cp objs/ngx_http_vhost_traffic_status_module.so /usr/lib/nginx/modules/
+      echo "load_module modules/ngx_http_vhost_traffic_status_module.so;" > /etc/nginx/modules-enabled/99-vts.conf
+      mkdir -p /etc/nginx/modules-enabled /var/log/nginx
+      rm -rf /tmp/nginx-1.27.4 /tmp/nginx-module-vts /tmp/nginx-1.27.4.tar.gz
+    permissions: "0755"
+
+  - path: /etc/nginx/nginx.conf
+    content: |
+      load_module modules/ngx_http_vhost_traffic_status_module.so;
+
+      worker_processes auto;
+      error_log /var/log/nginx/error.log warn;
+      pid /var/run/nginx.pid;
+
+      events {
+          worker_connections 1024;
+      }
+
+      http {
+          include       /etc/nginx/mime.types;
+          default_type  application/octet-stream;
+
+          log_format json_combined escape=json
+              '{'
+                  '"ts":"$time_iso8601",'
+                  '"remote_addr":"$remote_addr",'
+                  '"request_method":"$request_method",'
+                  '"request_uri":"$request_uri",'
+                  '"status":$status,'
+                  '"body_bytes_sent":$body_bytes_sent,'
+                  '"request_time":$request_time,'
+                  '"upstream_response_time":"$upstream_response_time",'
+                  '"upstream_addr":"$upstream_addr",'
+                  '"http_user_agent":"$http_user_agent",'
+                  '"http_host":"$http_host",'
+                  '"server_protocol":"$server_protocol",'
+                  '"request_length":$request_length,'
+                  '"bytes_sent":$bytes_sent
+              '}';
+
+          access_log /var/log/nginx/access.log json_combined;
+
+          vhost_traffic_status_zone;
+          vhost_traffic_status_filter_by_host on;
+
+          server {
+              listen 80;
+              server_name _;
+
+              location / {
+                  proxy_pass http://${backend_addr};
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Request-ID $request_id;
+              }
+
+              location /status {
+                  vhost_traffic_status_display;
+                  vhost_traffic_status_display_format json;
+              }
+
+              location /stub_status {
+                  stub_status;
+              }
+          }
+      }
+    permissions: "0644"
+
+  - path: /etc/vector/vector.toml
+    content: |
+      data_dir = "/var/lib/vector"
+
+      [sources.nginx_access]
+      type = "file"
+      include = ["/var/log/nginx/access.log"]
+      read_from = "end"
+
+      [sources.nginx_error]
+      type = "file"
+      include = ["/var/log/nginx/error.log"]
+      read_from = "end"
+
+      [transforms.parse_access]
+      type = "remap"
+      inputs = ["nginx_access"]
+      source = '''
+      . = parse_json!(.message)
+      '''
+
+      [transforms.parse_error]
+      type = "remap"
+      inputs = ["nginx_error"]
+      source = '''
+      . |= parse_json(.message) ?? { "msg": .message }
+      '''
+
+      [sinks.victorialogs_access]
+      type = "http"
+      inputs = ["parse_access"]
+      uri = "http://${vlinsert_addr}/insert/jsonline?_stream_fields=instance,_msg_field=msg&_time_field=ts"
+      method = "post"
+      encoding.codec = "json"
+      healthcheck.enabled = false
+
+      [sinks.victorialogs_error]
+      type = "http"
+      inputs = ["parse_error"]
+      uri = "http://${vlinsert_addr}/insert/jsonline?_stream_fields=instance,_msg_field=msg&_time_field=ts"
+      method = "post"
+      encoding.codec = "json"
+      healthcheck.enabled = false
+
+      [sources.vector_metrics]
+      type = "internal_metrics"
+
+      [sinks.vector_metrics_export]
+      type = "prometheus_exporter"
+      inputs = ["vector_metrics"]
+      address = "0.0.0.0:9598"
+    permissions: "0644"
+
+  - path: /etc/systemd/system/nginx.service
+    content: |
+      [Unit]
+      Description=nginx - high performance web server
+      After=network.target remote-fs.target nss-lookup.target
+
+      [Service]
+      Type=forking
+      PIDFile=/var/run/nginx.pid
+      ExecStartPre=/usr/sbin/nginx -t
+      ExecStart=/usr/sbin/nginx
+      ExecReload=/bin/kill -s HUP $MAINPID
+      ExecStop=/bin/kill -s QUIT $MAINPID
+      PrivateTmp=true
+
+      [Install]
+      WantedBy=multi-user.target
+    permissions: "0644"
+
+  - path: /etc/systemd/system/nginx-vts-exporter.service
+    content: |
+      [Unit]
+      Description=nginx-vts-exporter
+      After=network.target nginx.service
+
+      [Service]
+      Type=simple
+      ExecStart=/usr/local/bin/nginx-vts-exporter -nginx.scrape_uri=http://127.0.0.1:80/status/format/json -telemetry.address=:9913
+      Restart=always
+
+      [Install]
+      WantedBy=multi-user.target
+    permissions: "0644"
+
+runcmd:
+  - bash /tmp/build-nginx-vts.sh
+  - systemctl daemon-reload
+  - systemctl enable nginx
+  - systemctl start nginx
+  - wget -q https://github.com/hnlq715/nginx-vts-exporter/releases/download/v0.10.8/nginx-vts-exporter-v0.10.8.linux-amd64.tar.gz -O /tmp/nginx-vts-exporter.tar.gz
+  - tar xzf /tmp/nginx-vts-exporter.tar.gz -C /tmp
+  - mv /tmp/nginx-vts-exporter-v0.10.8.linux-amd64/nginx-vts-exporter /usr/local/bin/
+  - chmod +x /usr/local/bin/nginx-vts-exporter
+  - rm -rf /tmp/nginx-vts-exporter*
+  - systemctl daemon-reload
+  - systemctl enable nginx-vts-exporter
+  - systemctl start nginx-vts-exporter
+  - curl -1sLf 'https://repositories.timber.io/public/vector/gpg.3543DB2D0A2BC4B8.key' | gpg --dearmor -o /usr/share/keyrings/vector-archive-keyring.gpg
+  - echo "deb [signed-by=/usr/share/keyrings/vector-archive-keyring.gpg] https://repositories.timber.io/public/vector/deb/ubuntu $(lsb_release -cs) main" > /etc/apt/sources.list.d/vector.list
+  - apt-get update && apt-get install -y vector
+  - systemctl enable vector
+  - systemctl start vector

@@ -1,0 +1,49 @@
+data_dir = "/var/lib/vector"
+
+[sources.angie_access]
+type = "file"
+include = ["/var/log/angie/access.log"]
+read_from = "end"
+
+[sources.angie_error]
+type = "file"
+include = ["/var/log/angie/error.log"]
+read_from = "end"
+
+[transforms.parse_access]
+type = "remap"
+inputs = ["angie_access"]
+source = '''
+. = parse_json!(.message)
+'''
+
+[transforms.parse_error]
+type = "remap"
+inputs = ["angie_error"]
+source = '''
+. |= parse_json(.message) ?? { "msg": .message }
+'''
+
+[sinks.victorialogs_access]
+type = "http"
+inputs = ["parse_access"]
+uri = "http://VICTORIALOGS_VLINSERT_ADDR:9481/insert/jsonline?_stream_fields=instance,_msg_field=msg&_time_field=ts"
+method = "post"
+encoding.codec = "json"
+healthcheck.enabled = false
+
+[sinks.victorialogs_error]
+type = "http"
+inputs = ["parse_error"]
+uri = "http://VICTORIALOGS_VLINSERT_ADDR:9481/insert/jsonline?_stream_fields=instance,_msg_field=msg&_time_field=ts"
+method = "post"
+encoding.codec = "json"
+healthcheck.enabled = false
+
+[sources.vector_metrics]
+type = "internal_metrics"
+
+[sinks.vector_metrics_export]
+type = "prometheus_exporter"
+inputs = ["vector_metrics"]
+address = "0.0.0.0:9598"

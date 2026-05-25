@@ -13,6 +13,14 @@ vlselect:
 vlinsert:
   vmServiceScrape:
     enabled: true
+  ingress:
+    enabled: true
+    hosts:
+      - name: vlinsert.apatsev.org.ru
+        path:
+          - /
+        port: http
+    ingressClassName: nginx
 
 vlstorage:
   vmServiceScrape:

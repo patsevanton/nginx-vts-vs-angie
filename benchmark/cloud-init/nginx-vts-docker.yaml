@@ -1,0 +1,199 @@
+#cloud-config
+package_update: true
+package_upgrade: true
+packages:
+  - apt-transport-https
+  - ca-certificates
+  - curl
+  - gnupg
+  - lsb-release
+  - docker.io
+  - jq
+
+write_files:
+  - path: /opt/nginx-vts-docker/nginx.conf
+    content: |
+      worker_processes auto;
+      error_log /var/log/nginx/error.log warn;
+      pid /var/run/nginx.pid;
+
+      events {
+          worker_connections 1024;
+      }
+
+      http {
+          include       /etc/nginx/mime.types;
+          default_type  application/octet-stream;
+
+          log_format json_combined escape=json
+              '{'
+                  '"ts":"$time_iso8601",'
+                  '"remote_addr":"$remote_addr",'
+                  '"request_method":"$request_method",'
+                  '"request_uri":"$request_uri",'
+                  '"status":$status,'
+                  '"body_bytes_sent":$body_bytes_sent,'
+                  '"request_time":$request_time,'
+                  '"upstream_response_time":"$upstream_response_time",'
+                  '"upstream_addr":"$upstream_addr",'
+                  '"http_user_agent":"$http_user_agent",'
+                  '"http_host":"$http_host",'
+                  '"server_protocol":"$server_protocol",'
+                  '"request_length":$request_length,'
+                  '"bytes_sent":$bytes_sent
+              '}';
+
+          access_log /var/log/nginx/access.log json_combined;
+
+          vhost_traffic_status_zone;
+          vhost_traffic_status_filter_by_host on;
+
+          server {
+              listen 80;
+              server_name _;
+
+              location / {
+                  proxy_pass http://${backend_addr};
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Request-ID $request_id;
+              }
+
+              location /status {
+                  vhost_traffic_status_display;
+                  vhost_traffic_status_display_format json;
+              }
+
+              location /stub_status {
+                  stub_status;
+              }
+          }
+      }
+    permissions: "0644"
+
+  - path: /opt/nginx-vts-docker/vector.toml
+    content: |
+      data_dir = "/var/lib/vector"
+
+      [sources.nginx_access]
+      type = "file"
+      include = ["/var/log/nginx/access.log"]
+      read_from = "end"
+
+      [sources.nginx_error]
+      type = "file"
+      include = ["/var/log/nginx/error.log"]
+      read_from = "end"
+
+      [transforms.parse_access]
+      type = "remap"
+      inputs = ["nginx_access"]
+      source = '''
+      . = parse_json!(.message)
+      '''
+
+      [transforms.parse_error]
+      type = "remap"
+      inputs = ["nginx_error"]
+      source = '''
+      . |= parse_json(.message) ?? { "msg": .message }
+      '''
+
+      [sinks.victorialogs_access]
+      type = "http"
+      inputs = ["parse_access"]
+      uri = "http://${vlinsert_addr}/insert/jsonline?_stream_fields=instance,_msg_field=msg&_time_field=ts"
+      method = "post"
+      encoding.codec = "json"
+      healthcheck.enabled = false
+
+      [sinks.victorialogs_error]
+      type = "http"
+      inputs = ["parse_error"]
+      uri = "http://${vlinsert_addr}/insert/jsonline?_stream_fields=instance,_msg_field=msg&_time_field=ts"
+      method = "post"
+      encoding.codec = "json"
+      healthcheck.enabled = false
+
+      [sources.vector_metrics]
+      type = "internal_metrics"
+
+      [sinks.vector_metrics_export]
+      type = "prometheus_exporter"
+      inputs = ["vector_metrics"]
+      address = "0.0.0.0:9598"
+    permissions: "0644"
+
+  - path: /opt/nginx-vts-docker/docker-compose.yml
+    content: |
+      version: "3.8"
+      services:
+        nginx-vts:
+          build:
+            context: .
+            dockerfile: Dockerfile
+          container_name: nginx-vts
+          ports:
+            - "80:80"
+          volumes:
+            - nginx-logs:/var/log/nginx
+          restart: unless-stopped
+
+        nginx-vts-exporter:
+          image: sophos/nginx-vts-exporter:v0.10.8
+          container_name: nginx-vts-exporter
+          environment:
+            NGINX_STATUS: "http://nginx-vts:80/status/format/json"
+            METRICS_ENDPOINT: "/metrics"
+            METRICS_PORT: "9913"
+          ports:
+            - "9913:9913"
+          depends_on:
+            - nginx-vts
+          restart: unless-stopped
+
+        vector:
+          image: timberio/vector:0.43.1-debian
+          container_name: vector
+          volumes:
+            - ./vector.toml:/etc/vector/vector.toml:ro
+            - nginx-logs:/var/log/nginx:ro
+            - vector-data:/var/lib/vector
+          ports:
+            - "9598:9598"
+          depends_on:
+            - nginx-vts
+          restart: unless-stopped
+
+      volumes:
+        nginx-logs:
+        vector-data:
+    permissions: "0644"
+
+  - path: /opt/nginx-vts-docker/Dockerfile
+    content: |
+      FROM nginx:1.27-bookworm
+
+      RUN apt-get update && apt-get install -y git build-essential libpcre3-dev zlib1g-dev libssl-dev wget && \
+          cd /tmp && \
+          wget https://github.com/vozlt/nginx-module-vts/archive/refs/tags/v0.2.2.tar.gz && \
+          tar xzf v0.2.2.tar.gz && \
+          wget https://nginx.org/download/nginx-1.27.4.tar.gz && \
+          tar xzf nginx-1.27.4.tar.gz && \
+          cd nginx-1.27.4 && \
+          ./configure --prefix=/etc/nginx --sbin-path=/usr/sbin/nginx --modules-path=/usr/lib64/nginx/modules \
+            --conf-path=/etc/nginx/nginx.conf --error-log-path=/var/log/nginx/error.log \
+            --http-log-path=/var/log/nginx/access.log --pid-path=/var/run/nginx.pid \
+            --with-compat --add-dynamic-module=/tmp/nginx-module-vts-0.2.2 && \
+          make modules && \
+          cp objs/ngx_http_vhost_traffic_status_module.so /usr/lib/nginx/modules/ && \
+          apt-get purge -y git build-essential wget && apt-get autoremove -y && \
+          rm -rf /tmp/nginx-* /var/lib/apt/lists/*
+
+      RUN echo "load_module modules/ngx_http_vhost_traffic_status_module.so;" > /etc/nginx/modules-enabled/99-vts.conf
+    permissions: "0644"
+
+runcmd:
+  - systemctl enable docker
+  - systemctl start docker
+  - docker compose -f /opt/nginx-vts-docker/docker-compose.yml up -d

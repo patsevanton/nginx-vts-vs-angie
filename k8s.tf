@@ -98,6 +98,17 @@ provider "helm" {
   }
 }
 
+provider "kubernetes" {
+  host                   = yandex_kubernetes_cluster.nginx-vts-vs-angie.master[0].external_v4_endpoint
+  cluster_ca_certificate = yandex_kubernetes_cluster.nginx-vts-vs-angie.master[0].cluster_ca_certificate
+
+  exec {
+    api_version = "client.authentication.k8s.io/v1beta1"
+    args        = ["k8s", "create-token"]
+    command     = "yc"
+  }
+}
+
 resource "helm_release" "ingress_nginx" {
   name             = "ingress-nginx"
   chart            = "oci://cr.yandex/yc-marketplace/yandex-cloud/ingress-nginx/chart/ingress-nginx"
@@ -124,6 +135,59 @@ resource "helm_release" "ingress_nginx" {
         }
       }
     })
+  ]
+}
+
+resource "helm_release" "victoriametrics" {
+  name             = "victoriametrics"
+  chart            = "victoria-metrics-k8s-stack"
+  version          = "0.41.2"
+  namespace        = "monitoring"
+  create_namespace = true
+  repository       = "https://victoriametrics.github.io/helm-charts/"
+
+  depends_on = [yandex_kubernetes_cluster.nginx-vts-vs-angie]
+
+  values = [
+    file("${path.module}/victoriametrics-values.yaml"),
+    templatefile("${path.module}/benchmark/scrape-targets.yaml.tftpl", {
+      nginx_vts_docker_ip = yandex_compute_instance.nginx-vts-docker.network_interface.0.nat_ip_address
+      nginx_vts_ip        = yandex_compute_instance.nginx-vts.network_interface.0.nat_ip_address
+      angie_ip            = yandex_compute_instance.angie.network_interface.0.nat_ip_address
+    }),
+  ]
+}
+
+resource "helm_release" "victoria_logs_cluster" {
+  name             = "victoria-logs-cluster"
+  chart            = "victoria-logs-cluster"
+  version          = "0.0.3"
+  namespace        = "victoria-logs-cluster"
+  create_namespace = true
+  repository       = "https://victoriametrics.github.io/helm-charts/"
+
+  depends_on = [yandex_kubernetes_cluster.nginx-vts-vs-angie]
+
+  values = [
+    file("${path.module}/victoria-logs-cluster-values.yaml")
+  ]
+}
+
+resource "helm_release" "victoria_logs_collector" {
+  name             = "victoria-logs-collector"
+  chart            = "victoria-logs-collector"
+  version          = "0.0.1"
+  namespace        = "victoria-logs-cluster"
+  create_namespace = false
+  repository       = "https://victoriametrics.github.io/helm-charts/"
+
+  depends_on = [
+    yandex_kubernetes_cluster.nginx-vts-vs-angie,
+    helm_release.victoria_logs_cluster,
+  ]
+
+  values = [
+    file("${path.module}/victoria-logs-collector-values.yaml")
   ]
 }
 
