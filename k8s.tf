@@ -85,19 +85,6 @@ resource "yandex_kubernetes_node_group" "k8s-node-group" {
   }
 }
 
-provider "helm" {
-  kubernetes = {
-    host                   = yandex_kubernetes_cluster.nginx-vts-vs-angie.master[0].external_v4_endpoint
-    cluster_ca_certificate = yandex_kubernetes_cluster.nginx-vts-vs-angie.master[0].cluster_ca_certificate
-
-    exec = {
-      api_version = "client.authentication.k8s.io/v1beta1"
-      args        = ["k8s", "create-token"]
-      command     = "yc"
-    }
-  }
-}
-
 provider "kubernetes" {
   host                   = yandex_kubernetes_cluster.nginx-vts-vs-angie.master[0].external_v4_endpoint
   cluster_ca_certificate = yandex_kubernetes_cluster.nginx-vts-vs-angie.master[0].cluster_ca_certificate
@@ -109,86 +96,173 @@ provider "kubernetes" {
   }
 }
 
-resource "helm_release" "ingress_nginx" {
-  name             = "ingress-nginx"
-  chart            = "oci://cr.yandex/yc-marketplace/yandex-cloud/ingress-nginx/chart/ingress-nginx"
-  version          = "4.13.0"
-  namespace        = "ingress-nginx"
-  create_namespace = true
+locals {
+  kubeconfig_path = "${path.module}/.kubeconfig"
 
-  depends_on = [
-    yandex_kubernetes_cluster.nginx-vts-vs-angie
-  ]
+  ingress_nginx_values = templatefile("${path.module}/values/ingress-nginx-values.yaml.tftpl", {
+    loadbalancer_ip = yandex_vpc_address.addr.external_ipv4_address[0].address
+  })
 
-  values = [
-    yamlencode({
-      controller = {
-        service = {
-          loadBalancerIP = yandex_vpc_address.addr.external_ipv4_address[0].address
-        }
-        config = {
-          log-format-escape-json = "true"
-          log-format-upstream = trimspace(<<-EOT
-            {"ts":"$time_iso8601","http":{"request_id":"$req_id","method":"$request_method","status_code":$status,"url":"$host$request_uri","host":"$host","uri":"$request_uri","request_time":$request_time,"user_agent":"$http_user_agent","protocol":"$server_protocol","trace_session_id":"$http_trace_session_id","server_protocol":"$server_protocol","content_type":"$sent_http_content_type","bytes_sent":"$bytes_sent"},"nginx":{"x-forward-for":"$proxy_add_x_forwarded_for","remote_addr":"$proxy_protocol_addr","http_referrer":"$http_referer"}}
-          EOT
-          )
-        }
-      }
-    })
-  ]
+  victoriametrics_values = templatefile("${path.module}/values/victoriametrics-values.yaml.tftpl", {
+    nginx_vts_docker_ip = yandex_compute_instance.nginx-vts-docker.network_interface.0.nat_ip_address
+    nginx_vts_ip        = yandex_compute_instance.nginx-vts.network_interface.0.nat_ip_address
+    angie_ip            = yandex_compute_instance.angie.network_interface.0.nat_ip_address
+  })
+
+  victoria_logs_cluster_values = templatefile("${path.module}/values/victoria-logs-cluster-values.yaml.tftpl", {})
+
+  victoria_logs_collector_values = templatefile("${path.module}/values/victoria-logs-collector-values.yaml.tftpl", {})
 }
 
-resource "helm_release" "victoriametrics" {
-  name             = "victoriametrics"
-  chart            = "victoria-metrics-k8s-stack"
-  version          = "0.41.2"
-  namespace        = "monitoring"
-  create_namespace = true
-  repository       = "https://victoriametrics.github.io/helm-charts/"
-
-  depends_on = [yandex_kubernetes_cluster.nginx-vts-vs-angie]
-
-  values = [
-    file("${path.module}/victoriametrics-values.yaml"),
-    templatefile("${path.module}/benchmark/scrape-targets.yaml.tftpl", {
-      nginx_vts_docker_ip = yandex_compute_instance.nginx-vts-docker.network_interface.0.nat_ip_address
-      nginx_vts_ip        = yandex_compute_instance.nginx-vts.network_interface.0.nat_ip_address
-      angie_ip            = yandex_compute_instance.angie.network_interface.0.nat_ip_address
-    }),
-  ]
+resource "local_file" "ingress_nginx_values" {
+  content         = local.ingress_nginx_values
+  filename        = "${path.module}/values/ingress-nginx-values.yaml"
+  file_permission = "0644"
 }
 
-resource "helm_release" "victoria_logs_cluster" {
-  name             = "victoria-logs-cluster"
-  chart            = "victoria-logs-cluster"
-  version          = "0.0.3"
-  namespace        = "victoria-logs-cluster"
-  create_namespace = true
-  repository       = "https://victoriametrics.github.io/helm-charts/"
-
-  depends_on = [yandex_kubernetes_cluster.nginx-vts-vs-angie]
-
-  values = [
-    file("${path.module}/victoria-logs-cluster-values.yaml")
-  ]
+resource "local_file" "victoriametrics_values" {
+  content         = local.victoriametrics_values
+  filename        = "${path.module}/values/victoriametrics-values.yaml"
+  file_permission = "0644"
 }
 
-resource "helm_release" "victoria_logs_collector" {
-  name             = "victoria-logs-collector"
-  chart            = "victoria-logs-collector"
-  version          = "0.0.1"
-  namespace        = "victoria-logs-cluster"
-  create_namespace = false
-  repository       = "https://victoriametrics.github.io/helm-charts/"
+resource "local_file" "victoria_logs_cluster_values" {
+  content         = local.victoria_logs_cluster_values
+  filename        = "${path.module}/values/victoria-logs-cluster-values.yaml"
+  file_permission = "0644"
+}
+
+resource "local_file" "victoria_logs_collector_values" {
+  content         = local.victoria_logs_collector_values
+  filename        = "${path.module}/values/victoria-logs-collector-values.yaml"
+  file_permission = "0644"
+}
+
+resource "local_file" "kubeconfig" {
+  content = <<-KUBECONFIG
+apiVersion: v1
+kind: Config
+current-context: nginx-vts-vs-angie
+contexts:
+  - context:
+      cluster: nginx-vts-vs-angie
+      user: yc
+    name: nginx-vts-vs-angie
+clusters:
+  - cluster:
+      certificate-authority-data: ${base64encode(yandex_kubernetes_cluster.nginx-vts-vs-angie.master[0].cluster_ca_certificate)}
+      server: ${yandex_kubernetes_cluster.nginx-vts-vs-angie.master[0].external_v4_endpoint}
+    name: nginx-vts-vs-angie
+users:
+  - name: yc
+    user:
+      exec:
+        apiVersion: client.authentication.k8s.io/v1beta1
+        command: yc
+        args:
+          - k8s
+          - create-token
+KUBECONFIG
+  filename        = local.kubeconfig_path
+  file_permission = "0600"
+}
+
+resource "null_resource" "helm_ingress_nginx" {
+  triggers = {
+    values_hash = sha256(local.ingress_nginx_values)
+  }
 
   depends_on = [
     yandex_kubernetes_cluster.nginx-vts-vs-angie,
-    helm_release.victoria_logs_cluster,
+    local_file.ingress_nginx_values,
+    local_file.kubeconfig,
   ]
 
-  values = [
-    file("${path.module}/victoria-logs-collector-values.yaml")
+  provisioner "local-exec" {
+    command = <<-EOF
+      helm upgrade --install ingress-nginx \
+        oci://cr.yandex/yc-marketplace/yandex-cloud/ingress-nginx/chart/ingress-nginx \
+        --version 4.13.0 \
+        --namespace ingress-nginx --create-namespace \
+        -f ${local_file.ingress_nginx_values.filename} \
+        --kubeconfig ${local.kubeconfig_path}
+    EOF
+  }
+}
+
+resource "null_resource" "helm_victoriametrics" {
+  triggers = {
+    values_hash = sha256(local.victoriametrics_values)
+  }
+
+  depends_on = [
+    yandex_kubernetes_cluster.nginx-vts-vs-angie,
+    local_file.victoriametrics_values,
+    local_file.kubeconfig,
   ]
+
+  provisioner "local-exec" {
+    command = <<-EOF
+      helm repo add victoriametrics https://victoriametrics.github.io/helm-charts/ || true
+      helm repo update
+      helm upgrade --install victoriametrics \
+        victoriametrics/victoria-metrics-k8s-stack \
+        --version 0.41.2 \
+        --namespace monitoring --create-namespace \
+        -f ${local_file.victoriametrics_values.filename} \
+        --kubeconfig ${local.kubeconfig_path}
+    EOF
+  }
+}
+
+resource "null_resource" "helm_victoria_logs_cluster" {
+  triggers = {
+    values_hash = sha256(local.victoria_logs_cluster_values)
+  }
+
+  depends_on = [
+    yandex_kubernetes_cluster.nginx-vts-vs-angie,
+    local_file.victoria_logs_cluster_values,
+    local_file.kubeconfig,
+  ]
+
+  provisioner "local-exec" {
+    command = <<-EOF
+      helm repo add victoriametrics https://victoriametrics.github.io/helm-charts/ || true
+      helm repo update
+      helm upgrade --install victoria-logs-cluster \
+        victoriametrics/victoria-logs-cluster \
+        --version 0.0.3 \
+        --namespace victoria-logs-cluster --create-namespace \
+        -f ${local_file.victoria_logs_cluster_values.filename} \
+        --kubeconfig ${local.kubeconfig_path}
+    EOF
+  }
+}
+
+resource "null_resource" "helm_victoria_logs_collector" {
+  triggers = {
+    values_hash = sha256(local.victoria_logs_collector_values)
+  }
+
+  depends_on = [
+    null_resource.helm_victoria_logs_cluster,
+    local_file.victoria_logs_collector_values,
+    local_file.kubeconfig,
+  ]
+
+  provisioner "local-exec" {
+    command = <<-EOF
+      helm repo add victoriametrics https://victoriametrics.github.io/helm-charts/ || true
+      helm repo update
+      helm upgrade --install victoria-logs-collector \
+        victoriametrics/victoria-logs-collector \
+        --version 0.0.1 \
+        --namespace victoria-logs-cluster \
+        -f ${local_file.victoria_logs_collector_values.filename} \
+        --kubeconfig ${local.kubeconfig_path}
+    EOF
+  }
 }
 
 output "k8s_cluster_credentials_command" {

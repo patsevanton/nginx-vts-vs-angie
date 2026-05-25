@@ -36,3 +36,9 @@ override.tf.json
 .terraformrc
 terraform.rc
 .terraform.lock.hcl
+
+# Generated kubeconfig
+.kubeconfig
+
+# Generated values files (from templatefile)
+values/*.yaml
