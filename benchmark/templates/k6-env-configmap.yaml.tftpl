@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: k6-env
+  namespace: ${namespace}
+data:
+  TARGET_NGINX_VTS_DOCKER: "${target_nginx_vts_docker}"
+  TARGET_NGINX_VTS: "${target_nginx_vts}"
+  TARGET_ANGIE: "${target_angie}"

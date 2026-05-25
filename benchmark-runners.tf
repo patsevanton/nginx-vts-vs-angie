@@ -1,206 +1,68 @@
-resource "kubernetes_job_v1" "k6_nginx_vts_docker" {
-  metadata {
-    name      = "k6-nginx-vts-docker"
-    namespace = kubernetes_namespace_v1.benchmark.metadata[0].name
-  }
+locals {
+  benchmark_k6_nginx_vts_docker_config = templatefile("${path.module}/benchmark/templates/k6-job.yaml.tftpl", {
+    namespace                = local.benchmark_namespace
+    variant                  = "nginx-vts-docker"
+    target_nginx_vts_docker  = yandex_compute_instance.nginx-vts-docker.network_interface.0.nat_ip_address
+    target_nginx_vts         = yandex_compute_instance.nginx-vts.network_interface.0.nat_ip_address
+    target_angie             = yandex_compute_instance.angie.network_interface.0.nat_ip_address
+  })
 
-  spec {
-    backoff_limit              = 0
-    active_deadline_seconds    = 1800
-    ttl_seconds_after_finished = 3600
+  benchmark_k6_nginx_vts_config = templatefile("${path.module}/benchmark/templates/k6-job.yaml.tftpl", {
+    namespace                = local.benchmark_namespace
+    variant                  = "nginx-vts"
+    target_nginx_vts_docker  = yandex_compute_instance.nginx-vts-docker.network_interface.0.nat_ip_address
+    target_nginx_vts         = yandex_compute_instance.nginx-vts.network_interface.0.nat_ip_address
+    target_angie             = yandex_compute_instance.angie.network_interface.0.nat_ip_address
+  })
 
-    template {
-      metadata {
-        labels = {
-          app = "k6"
-        }
-      }
-
-      spec {
-        restart_policy = "Never"
-
-        container {
-          name  = "k6"
-          image = "grafana/k6:0.56.0"
-
-          args = [
-            "run",
-            "--env", "VARIANT=nginx-vts-docker",
-            "--env", "TARGET_NGINX_VTS_DOCKER=${yandex_compute_instance.nginx-vts-docker.network_interface.0.nat_ip_address}",
-            "--env", "TARGET_NGINX_VTS=${yandex_compute_instance.nginx-vts.network_interface.0.nat_ip_address}",
-            "--env", "TARGET_ANGIE=${yandex_compute_instance.angie.network_interface.0.nat_ip_address}",
-            "/scripts/benchmark.js",
-          ]
-
-          volume_mount {
-            name       = "k6-script"
-            mount_path = "/scripts"
-          }
-
-          resources {
-            requests = {
-              cpu    = "500m"
-              memory = "256Mi"
-            }
-            limits = {
-              cpu    = "2"
-              memory = "512Mi"
-            }
-          }
-        }
-
-        volume {
-          name = "k6-script"
-          config_map {
-            name = kubernetes_config_map_v1.k6_script.metadata[0].name
-          }
-        }
-      }
-    }
-  }
-
-  depends_on = [
-    kubernetes_deployment_v1.backend,
-    kubernetes_service_v1.backend,
-  ]
-
-  wait_for_completion = false
+  benchmark_k6_angie_config = templatefile("${path.module}/benchmark/templates/k6-job.yaml.tftpl", {
+    namespace                = local.benchmark_namespace
+    variant                  = "angie"
+    target_nginx_vts_docker  = yandex_compute_instance.nginx-vts-docker.network_interface.0.nat_ip_address
+    target_nginx_vts         = yandex_compute_instance.nginx-vts.network_interface.0.nat_ip_address
+    target_angie             = yandex_compute_instance.angie.network_interface.0.nat_ip_address
+  })
 }
 
-resource "kubernetes_job_v1" "k6_nginx_vts" {
-  metadata {
-    name      = "k6-nginx-vts"
-    namespace = kubernetes_namespace_v1.benchmark.metadata[0].name
-  }
-
-  spec {
-    backoff_limit              = 0
-    active_deadline_seconds    = 1800
-    ttl_seconds_after_finished = 3600
-
-    template {
-      metadata {
-        labels = {
-          app = "k6"
-        }
-      }
-
-      spec {
-        restart_policy = "Never"
-
-        container {
-          name  = "k6"
-          image = "grafana/k6:0.56.0"
-
-          args = [
-            "run",
-            "--env", "VARIANT=nginx-vts",
-            "--env", "TARGET_NGINX_VTS_DOCKER=${yandex_compute_instance.nginx-vts-docker.network_interface.0.nat_ip_address}",
-            "--env", "TARGET_NGINX_VTS=${yandex_compute_instance.nginx-vts.network_interface.0.nat_ip_address}",
-            "--env", "TARGET_ANGIE=${yandex_compute_instance.angie.network_interface.0.nat_ip_address}",
-            "/scripts/benchmark.js",
-          ]
-
-          volume_mount {
-            name       = "k6-script"
-            mount_path = "/scripts"
-          }
-
-          resources {
-            requests = {
-              cpu    = "500m"
-              memory = "256Mi"
-            }
-            limits = {
-              cpu    = "2"
-              memory = "512Mi"
-            }
-          }
-        }
-
-        volume {
-          name = "k6-script"
-          config_map {
-            name = kubernetes_config_map_v1.k6_script.metadata[0].name
-          }
-        }
-      }
-    }
-  }
-
-  depends_on = [
-    kubernetes_deployment_v1.backend,
-    kubernetes_service_v1.backend,
-  ]
-
-  wait_for_completion = false
+resource "local_file" "benchmark_k6_nginx_vts_docker" {
+  content         = local.benchmark_k6_nginx_vts_docker_config
+  filename        = "${path.module}/benchmark/manifests/k6-nginx-vts-docker-job.yaml"
+  file_permission = "0644"
 }
 
-resource "kubernetes_job_v1" "k6_angie" {
-  metadata {
-    name      = "k6-angie"
-    namespace = kubernetes_namespace_v1.benchmark.metadata[0].name
-  }
+resource "local_file" "benchmark_k6_nginx_vts" {
+  content         = local.benchmark_k6_nginx_vts_config
+  filename        = "${path.module}/benchmark/manifests/k6-nginx-vts-job.yaml"
+  file_permission = "0644"
+}
 
-  spec {
-    backoff_limit              = 0
-    active_deadline_seconds    = 1800
-    ttl_seconds_after_finished = 3600
+resource "local_file" "benchmark_k6_angie" {
+  content         = local.benchmark_k6_angie_config
+  filename        = "${path.module}/benchmark/manifests/k6-angie-job.yaml"
+  file_permission = "0644"
+}
 
-    template {
-      metadata {
-        labels = {
-          app = "k6"
-        }
-      }
-
-      spec {
-        restart_policy = "Never"
-
-        container {
-          name  = "k6"
-          image = "grafana/k6:0.56.0"
-
-          args = [
-            "run",
-            "--env", "VARIANT=angie",
-            "--env", "TARGET_NGINX_VTS_DOCKER=${yandex_compute_instance.nginx-vts-docker.network_interface.0.nat_ip_address}",
-            "--env", "TARGET_NGINX_VTS=${yandex_compute_instance.nginx-vts.network_interface.0.nat_ip_address}",
-            "--env", "TARGET_ANGIE=${yandex_compute_instance.angie.network_interface.0.nat_ip_address}",
-            "/scripts/benchmark.js",
-          ]
-
-          volume_mount {
-            name       = "k6-script"
-            mount_path = "/scripts"
-          }
-
-          resources {
-            requests = {
-              cpu    = "500m"
-              memory = "256Mi"
-            }
-            limits = {
-              cpu    = "2"
-              memory = "512Mi"
-            }
-          }
-        }
-
-        volume {
-          name = "k6-script"
-          config_map {
-            name = kubernetes_config_map_v1.k6_script.metadata[0].name
-          }
-        }
-      }
-    }
+resource "null_resource" "kubectl_apply_k6_jobs" {
+  triggers = {
+    k6_nginx_vts_docker_hash = sha256(local.benchmark_k6_nginx_vts_docker_config)
+    k6_nginx_vts_hash        = sha256(local.benchmark_k6_nginx_vts_config)
+    k6_angie_hash            = sha256(local.benchmark_k6_angie_config)
   }
 
   depends_on = [
-    kubernetes_deployment_v1.backend,
-    kubernetes_service_v1.backend,
+    null_resource.kubectl_apply_benchmark,
+    local_file.benchmark_k6_nginx_vts_docker,
+    local_file.benchmark_k6_nginx_vts,
+    local_file.benchmark_k6_angie,
   ]
 
-  wait_for_completion = false
+  provisioner "local-exec" {
+    command = <<-EOF
+      kubectl apply \
+        -f ${local_file.benchmark_k6_nginx_vts_docker.filename} \
+        -f ${local_file.benchmark_k6_nginx_vts.filename} \
+        -f ${local_file.benchmark_k6_angie.filename} \
+        --kubeconfig ${local.kubeconfig_path}
+    EOF
+  }
 }

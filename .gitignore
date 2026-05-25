@@ -42,3 +42,6 @@ terraform.rc
 
 # Generated values files (from templatefile)
 values/*.yaml
+
+# Generated benchmark manifests (from templatefile)
+benchmark/manifests/

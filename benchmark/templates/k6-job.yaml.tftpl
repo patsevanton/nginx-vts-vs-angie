@@ -1,0 +1,43 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: k6-${variant}
+  namespace: ${namespace}
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 1800
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        app: k6
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: k6
+          image: grafana/k6:0.56.0
+          args:
+            - "run"
+            - "--env"
+            - "VARIANT=${variant}"
+            - "--env"
+            - "TARGET_NGINX_VTS_DOCKER=${target_nginx_vts_docker}"
+            - "--env"
+            - "TARGET_NGINX_VTS=${target_nginx_vts}"
+            - "--env"
+            - "TARGET_ANGIE=${target_angie}"
+            - "/scripts/benchmark.js"
+          volumeMounts:
+            - name: k6-script
+              mountPath: /scripts
+          resources:
+            requests:
+              cpu: 500m
+              memory: 256Mi
+            limits:
+              cpu: "2"
+              memory: 512Mi
+      volumes:
+        - name: k6-script
+          configMap:
+            name: k6-script
