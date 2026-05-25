@@ -1,12 +1,10 @@
 # Настройки отправки логов во внешнее хранилище (VictoriaLogs)
 remoteWrite:
   - url: http://victoria-logs-cluster-vlinsert.victoria-logs-cluster:9481
-    headers:
-      # Поля, которые будут проигнорированы и не сохранены в VictoriaLogs
-      VL-Ignore-Fields:
-        - kubernetes.container_id
-        - kubernetes.pod_ip
-        - kubernetes.pod_labels.pod-template-hash
+    ignoreFields:
+      - kubernetes.container_id
+      - kubernetes.pod_ip
+      - kubernetes.pod_labels.pod-template-hash
 
 # Настройки collector: из каких полей извлекать основное сообщение лога (_msg в VictoriaLogs)
 collector:
