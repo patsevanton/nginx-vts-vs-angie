@@ -14,7 +14,7 @@ resource "yandex_compute_instance" "nginx-vts-docker" {
 
   boot_disk {
     initialize_params {
-      image_id = "fd8kdq6d0p8sij7h5qe3"
+      image_id = "fd806c8slu9j1pa87msc"
       size     = 30
       type     = "network-ssd"
     }
@@ -26,6 +26,7 @@ resource "yandex_compute_instance" "nginx-vts-docker" {
   }
 
   metadata = {
+    ssh-keys  = "ubuntu:${file("~/.ssh/id_ed25519.pub")}"
     user-data = templatefile("${path.module}/benchmark/cloud-init/nginx-vts-docker.yaml", {
       backend_addr = var.backend_addr
       vlinsert_addr = var.vlinsert_addr
@@ -49,7 +50,7 @@ resource "yandex_compute_instance" "nginx-vts" {
 
   boot_disk {
     initialize_params {
-      image_id = "fd8kdq6d0p8sij7h5qe3"
+      image_id = "fd806c8slu9j1pa87msc"
       size     = 30
       type     = "network-ssd"
     }
@@ -61,6 +62,7 @@ resource "yandex_compute_instance" "nginx-vts" {
   }
 
   metadata = {
+    ssh-keys  = "ubuntu:${file("~/.ssh/id_ed25519.pub")}"
     user-data = templatefile("${path.module}/benchmark/cloud-init/nginx-vts.yaml", {
       backend_addr = var.backend_addr
       vlinsert_addr = var.vlinsert_addr
@@ -84,7 +86,7 @@ resource "yandex_compute_instance" "angie" {
 
   boot_disk {
     initialize_params {
-      image_id = "fd8kdq6d0p8sij7h5qe3"
+      image_id = "fd806c8slu9j1pa87msc"
       size     = 30
       type     = "network-ssd"
     }
@@ -96,6 +98,7 @@ resource "yandex_compute_instance" "angie" {
   }
 
   metadata = {
+    ssh-keys  = "ubuntu:${file("~/.ssh/id_ed25519.pub")}"
     user-data = templatefile("${path.module}/benchmark/cloud-init/angie.yaml", {
       backend_addr = var.backend_addr
       vlinsert_addr = var.vlinsert_addr
