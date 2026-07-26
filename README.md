@@ -68,7 +68,6 @@ Terraform-конфигурация для сравнительного бенч�
 | `benchmark/configs/*.conf` | nginx/angie конфигурации |
 | `benchmark/configs/vector-*.toml` | vector конфигурации |
 | `benchmark/grafana/benchmark-dashboard.json` | Grafana dashboard |
-| `Makefile` | Утилиты для запуска бенчмарка |
 
 ## Порядок развёртывания
 
@@ -134,31 +133,47 @@ kubectl apply -f benchmark/manifests/k6-nginx-vts-docker-job.yaml -f benchmark/m
 ### 5. Запуск бенчмарка
 
 ```bash
-# Все три варианта последовательно
-make benchmark
+# nginx-vts-docker
+terraform output -raw k8s_cluster_credentials_command | sh > /dev/null 2>&1 || true
+kubectl delete job k6-nginx-vts-docker -n benchmark --ignore-not-found
+terraform output -json k6_jobs | jq -r '.["nginx-vts-docker"]' | kubectl apply -f -
 
-# Или по одному
-make run-k6-nginx-vts-docker
-make run-k6-nginx-vts
-make run-k6-angie
+# nginx-vts (через 30 сек)
+sleep 30
+kubectl delete job k6-nginx-vts -n benchmark --ignore-not-found
+terraform output -json k6_jobs | jq -r '.["nginx-vts"]' | kubectl apply -f -
+
+# angie (через 30 сек)
+sleep 30
+kubectl delete job k6-angie -n benchmark --ignore-not-found
+terraform output -json k6_jobs | jq -r '.["angie"]' | kubectl apply -f -
 ```
 
 ### 6. Проверка результатов
 
 ```bash
 # Статус k6 jobs
-make benchmark-status
+kubectl get jobs -n benchmark
+kubectl get pods -n benchmark -l app=k6
 
 # Логи k6
-make benchmark-logs
+kubectl logs job/k6-nginx-vts-docker -n benchmark
+kubectl logs job/k6-nginx-vts -n benchmark
+kubectl logs job/k6-angie -n benchmark
 
 # Проверка сервисов на VM
-make check-services
+for name_ip in "nginx-vts-docker:$(terraform output -raw vm_nginx_vts_docker_ip)" "nginx-vts:$(terraform output -raw vm_nginx_vts_ip)" "angie:$(terraform output -raw vm_angie_ip)"; do
+  name="${name_ip%%:*}"; ip="${name_ip##*:}"
+  echo "=== $name ($ip) ==="
+  echo -n "  HTTP: "; curl -s -o /dev/null -w "%{http_code}" "http://$ip/" || echo "FAIL"; echo ""
+  echo -n "  Metrics: "; curl -s -o /dev/null -w "%{http_code}" "http://$ip:9913/metrics" || echo "N/A"; echo ""
+  echo -n "  Vector: "; curl -s -o /dev/null -w "%{http_code}" "http://$ip:9598/metrics" || echo "N/A"; echo ""
+done
 
 # SSH на VM
-make vm-ssh-nginx-vts-docker
-make vm-ssh-nginx-vts
-make vm-ssh-angie
+ssh root@$(terraform output -raw vm_nginx_vts_docker_ip)
+ssh root@$(terraform output -raw vm_nginx_vts_ip)
+ssh root@$(terraform output -raw vm_angie_ip)
 ```
 
 ### 7. Доступ к мониторингу

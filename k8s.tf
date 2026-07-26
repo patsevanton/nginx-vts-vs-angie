@@ -74,8 +74,8 @@ resource "yandex_kubernetes_node_group" "k8s-node-group" {
     }
 
     resources {
-      memory = 4
-      cores  = 2
+      memory = 8
+      cores  = 4
     }
 
     boot_disk {
