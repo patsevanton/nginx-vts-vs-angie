@@ -105,17 +105,17 @@ helm upgrade --install vmks \
   -f ./values/victoriametrics-values.yaml
 
 # VictoriaLogs cluster
-helm upgrade --install victoria-logs-cluster \
+helm upgrade --install vlcluster \
   victoriametrics/victoria-logs-cluster \
   --version 0.2.8 \
-  --namespace victoria-logs-cluster --create-namespace \
+  --namespace vlcluster --create-namespace \
   -f ./values/victoria-logs-cluster-values.yaml
 
 # VictoriaLogs collector (сбор логов с подов)
-helm upgrade --install victoria-logs-collector \
+helm upgrade --install vlcollector \
   victoriametrics/victoria-logs-collector \
   --version 0.3.7 \
-  --namespace victoria-logs-cluster \
+  --namespace vlcollector \
   -f ./values/victoria-logs-collector-values.yaml
 ```
 
