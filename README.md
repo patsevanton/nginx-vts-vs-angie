@@ -98,10 +98,10 @@ helm repo add victoriametrics https://victoriametrics.github.io/helm-charts/
 helm repo update
 
 # VictoriaMetrics (k8s-stack: vmoperator, vmagent, vmselect, vminsert, Grafana)
-helm upgrade --install victoriametrics \
+helm upgrade --install vmks \
   victoriametrics/victoria-metrics-k8s-stack \
   --version 0.87.0 \
-  --namespace monitoring --create-namespace \
+  --namespace vmks --create-namespace \
   -f ./values/victoriametrics-values.yaml
 
 # VictoriaLogs cluster
