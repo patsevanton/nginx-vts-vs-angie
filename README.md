@@ -59,10 +59,10 @@ Terraform-конфигурация для сравнительного бенч�
 | `benchmark-vms.tf` | 3 VM для nginx-vts-docker, nginx-vts, angie |
 | `benchmark-k8s.tf` | Namespace "benchmark", backend, ConfigMap с k6-скриптом |
 | `benchmark-runners.tf` | k6 Job для каждого варианта |
-| `victoriametrics-values.yaml` | Helm values: VictoriaMetrics + Grafana + vmagent |
-| `victoria-logs-cluster-values.yaml` | Helm values: VictoriaLogs cluster + vlinsert ingress |
-| `victoria-logs-collector-values.yaml` | Helm values: лог-коллектор |
-| `benchmark/scrape-targets.yaml.tftpl` | Scrape targets для vmagent (VM метрики) |
+| `values/victoriametrics-values.yaml` | Helm values: VictoriaMetrics + Grafana + vmagent |
+| `values/victoria-logs-cluster-values.yaml` | Helm values: VictoriaLogs cluster + vlinsert ingress |
+| `values/victoria-logs-collector-values.yaml` | Helm values: лог-коллектор |
+| `values/*.tftpl` | Шаблоны values (генерируются Terraform через `templatefile`) |
 | `benchmark/k6/benchmark.js` | k6 скрипт нагрузки |
 | `benchmark/cloud-init/*.yaml` | cloud-init для каждой VM |
 | `benchmark/configs/*.conf` | nginx/angie конфигурации |
