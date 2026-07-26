@@ -56,35 +56,9 @@ resource "local_file" "benchmark_k6_env" {
   file_permission = "0644"
 }
 
-resource "null_resource" "kubectl_apply_benchmark" {
-  triggers = {
-    namespace_hash     = sha256(local.benchmark_namespace_config)
-    deployment_hash    = sha256(local.benchmark_backend_deployment_config)
-    service_hash       = sha256(local.benchmark_backend_service_config)
-    k6_script_hash     = sha256(local.benchmark_k6_script_config)
-    k6_env_hash        = sha256(local.benchmark_k6_env_config)
-  }
-
-  depends_on = [
-    yandex_kubernetes_cluster.nginx-vts-vs-angie,
-    yandex_kubernetes_node_group.k8s-node-group,
-    local_file.benchmark_namespace,
-    local_file.benchmark_backend_deployment,
-    local_file.benchmark_backend_service,
-    local_file.benchmark_k6_script,
-    local_file.benchmark_k6_env,
-    local_file.kubeconfig,
-  ]
-
-  provisioner "local-exec" {
-    command = <<-EOF
-      kubectl apply -f ${local_file.benchmark_namespace.filename} \
-        --kubeconfig ${local.kubeconfig_path} && \
-      kubectl apply -f ${local_file.benchmark_backend_deployment.filename} \
-        -f ${local_file.benchmark_backend_service.filename} \
-        -f ${local_file.benchmark_k6_script.filename} \
-        -f ${local_file.benchmark_k6_env.filename} \
-        --kubeconfig ${local.kubeconfig_path}
-    EOF
-  }
+output "kubectl_apply_benchmark_command" {
+  value = <<-EOT
+    kubectl apply -f ${local_file.benchmark_namespace.filename} --kubeconfig ${local.kubeconfig_path}
+    kubectl apply -f ${local_file.benchmark_backend_deployment.filename} -f ${local_file.benchmark_backend_service.filename} -f ${local_file.benchmark_k6_script.filename} -f ${local_file.benchmark_k6_env.filename} --kubeconfig ${local.kubeconfig_path}
+  EOT
 }

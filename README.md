@@ -94,7 +94,17 @@ make deploy-helm
 $(terraform output -raw k8s_cluster_credentials_command)
 ```
 
-### 4. Запуск бенчмарка
+### 4. Применение benchmark-манифестов
+
+```bash
+# Namespace, backend, ConfigMap с k6-скриптом
+$(terraform output -raw kubectl_apply_benchmark_command)
+
+# k6 Jobs
+$(terraform output -raw kubectl_apply_k6_jobs_command)
+```
+
+### 5. Запуск бенчмарка
 
 ```bash
 # Все три варианта последовательно
@@ -106,7 +116,7 @@ make run-k6-nginx-vts
 make run-k6-angie
 ```
 
-### 5. Проверка результатов
+### 6. Проверка результатов
 
 ```bash
 # Статус k6 jobs
@@ -124,7 +134,7 @@ make vm-ssh-nginx-vts
 make vm-ssh-angie
 ```
 
-### 6. Доступ к мониторингу
+### 7. Доступ к мониторингу
 
 - **Grafana**: `http://grafana.apatsev.org.ru`
 - **VictoriaMetrics**: `http://vmselect.apatsev.org.ru`

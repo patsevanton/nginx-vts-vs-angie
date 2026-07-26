@@ -156,28 +156,42 @@ KUBECONFIG
   file_permission = "0600"
 }
 
-resource "null_resource" "helm_ingress_nginx" {
-  triggers = {
-    values_hash = sha256(local.ingress_nginx_values)
+provider "kubernetes" {
+  host                   = yandex_kubernetes_cluster.nginx-vts-vs-angie.master[0].external_v4_endpoint
+  cluster_ca_certificate = yandex_kubernetes_cluster.nginx-vts-vs-angie.master[0].cluster_ca_certificate
+  exec {
+    api_version = "client.authentication.k8s.io/v1beta1"
+    command     = "yc"
+    args        = ["k8s", "create-token"]
   }
+}
+
+provider "helm" {
+  kubernetes = {
+    host                   = yandex_kubernetes_cluster.nginx-vts-vs-angie.master[0].external_v4_endpoint
+    cluster_ca_certificate = yandex_kubernetes_cluster.nginx-vts-vs-angie.master[0].cluster_ca_certificate
+    exec = {
+      api_version = "client.authentication.k8s.io/v1beta1"
+      command     = "yc"
+      args        = ["k8s", "create-token"]
+    }
+  }
+}
+
+resource "helm_release" "ingress_nginx" {
+  name             = "ingress-nginx"
+  repository       = "oci://cr.yandex/yc-marketplace/yandex-cloud/ingress-nginx/chart"
+  chart            = "ingress-nginx"
+  version          = "4.13.0"
+  namespace        = "ingress-nginx"
+  create_namespace = true
+
+  values = [local.ingress_nginx_values]
 
   depends_on = [
     yandex_kubernetes_cluster.nginx-vts-vs-angie,
     yandex_kubernetes_node_group.k8s-node-group,
-    local_file.ingress_nginx_values,
-    local_file.kubeconfig,
   ]
-
-  provisioner "local-exec" {
-    command = <<-EOF
-      helm upgrade --install ingress-nginx \
-        oci://cr.yandex/yc-marketplace/yandex-cloud/ingress-nginx/chart/ingress-nginx \
-        --version 4.13.0 \
-        --namespace ingress-nginx --create-namespace \
-        -f ${local_file.ingress_nginx_values.filename} \
-        --kubeconfig ${local.kubeconfig_path}
-    EOF
-  }
 }
 
 output "k8s_cluster_credentials_command" {

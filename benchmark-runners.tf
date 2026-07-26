@@ -42,27 +42,8 @@ resource "local_file" "benchmark_k6_angie" {
   file_permission = "0644"
 }
 
-resource "null_resource" "kubectl_apply_k6_jobs" {
-  triggers = {
-    k6_nginx_vts_docker_hash = sha256(local.benchmark_k6_nginx_vts_docker_config)
-    k6_nginx_vts_hash        = sha256(local.benchmark_k6_nginx_vts_config)
-    k6_angie_hash            = sha256(local.benchmark_k6_angie_config)
-  }
-
-  depends_on = [
-    null_resource.kubectl_apply_benchmark,
-    local_file.benchmark_k6_nginx_vts_docker,
-    local_file.benchmark_k6_nginx_vts,
-    local_file.benchmark_k6_angie,
-  ]
-
-  provisioner "local-exec" {
-    command = <<-EOF
-      kubectl apply \
-        -f ${local_file.benchmark_k6_nginx_vts_docker.filename} \
-        -f ${local_file.benchmark_k6_nginx_vts.filename} \
-        -f ${local_file.benchmark_k6_angie.filename} \
-        --kubeconfig ${local.kubeconfig_path}
-    EOF
-  }
+output "kubectl_apply_k6_jobs_command" {
+  value = <<-EOT
+    kubectl apply -f ${local_file.benchmark_k6_nginx_vts_docker.filename} -f ${local_file.benchmark_k6_nginx_vts.filename} -f ${local_file.benchmark_k6_angie.filename} --kubeconfig ${local.kubeconfig_path}
+  EOT
 }
