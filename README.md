@@ -82,10 +82,11 @@ terraform apply
 
 ### 2. Получение доступа к K8s
 
-После `terraform apply` получите учётные данные кластера (добавляет контекст в `~/.kube/config`):
+После успешного `terraform apply` получаем доступ к кластеру:
 
 ```bash
-$(terraform output -raw k8s_cluster_credentials_command)
+yc managed-kubernetes cluster get-credentials --id $(terraform output -raw k8s_cluster_id) --external --force
+kubectl get nodes
 ```
 
 ### 3. Установка мониторинга и логирования
