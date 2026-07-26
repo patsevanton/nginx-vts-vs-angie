@@ -163,6 +163,7 @@ resource "null_resource" "helm_ingress_nginx" {
 
   depends_on = [
     yandex_kubernetes_cluster.nginx-vts-vs-angie,
+    yandex_kubernetes_node_group.k8s-node-group,
     local_file.ingress_nginx_values,
     local_file.kubeconfig,
   ]
@@ -174,81 +175,6 @@ resource "null_resource" "helm_ingress_nginx" {
         --version 4.15.1 \
         --namespace ingress-nginx --create-namespace \
         -f ${local_file.ingress_nginx_values.filename} \
-        --kubeconfig ${local.kubeconfig_path}
-    EOF
-  }
-}
-
-resource "null_resource" "helm_victoriametrics" {
-  triggers = {
-    values_hash = sha256(local.victoriametrics_values)
-  }
-
-  depends_on = [
-    yandex_kubernetes_cluster.nginx-vts-vs-angie,
-    local_file.victoriametrics_values,
-    local_file.kubeconfig,
-  ]
-
-  provisioner "local-exec" {
-    command = <<-EOF
-      helm repo add victoriametrics https://victoriametrics.github.io/helm-charts/ || true
-      helm repo update
-      helm upgrade --install victoriametrics \
-        victoriametrics/victoria-metrics-k8s-stack \
-        --version 0.87.0 \
-        --namespace monitoring --create-namespace \
-        -f ${local_file.victoriametrics_values.filename} \
-        --kubeconfig ${local.kubeconfig_path}
-    EOF
-  }
-}
-
-resource "null_resource" "helm_victoria_logs_cluster" {
-  triggers = {
-    values_hash = sha256(local.victoria_logs_cluster_values)
-  }
-
-  depends_on = [
-    yandex_kubernetes_cluster.nginx-vts-vs-angie,
-    local_file.victoria_logs_cluster_values,
-    local_file.kubeconfig,
-  ]
-
-  provisioner "local-exec" {
-    command = <<-EOF
-      helm repo add victoriametrics https://victoriametrics.github.io/helm-charts/ || true
-      helm repo update
-      helm upgrade --install victoria-logs-cluster \
-        victoriametrics/victoria-logs-cluster \
-        --version 0.2.8 \
-        --namespace victoria-logs-cluster --create-namespace \
-        -f ${local_file.victoria_logs_cluster_values.filename} \
-        --kubeconfig ${local.kubeconfig_path}
-    EOF
-  }
-}
-
-resource "null_resource" "helm_victoria_logs_collector" {
-  triggers = {
-    values_hash = sha256(local.victoria_logs_collector_values)
-  }
-
-  depends_on = [
-    null_resource.helm_victoria_logs_cluster,
-    local_file.victoria_logs_collector_values,
-    local_file.kubeconfig,
-  ]
-
-  provisioner "local-exec" {
-    command = <<-EOF
-      helm repo add victoriametrics https://victoriametrics.github.io/helm-charts/ || true
-      helm repo update
-      helm upgrade --install victoria-logs-collector \
-        victoriametrics/victoria-logs-collector \
-        --version 0.3.7 \
-        --namespace victoria-logs-cluster \
-        -f ${local_file.victoria_logs_collector_values.filename} \
         --kubeconfig ${local.kubeconfig_path}
     EOF
   }

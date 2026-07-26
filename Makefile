@@ -1,4 +1,4 @@
-.PHONY: help init apply destroy benchmark run-k6-nginx-vts-docker run-k6-nginx-vts run-k6-angie
+.PHONY: help init apply destroy deploy-helm deploy-helm-victoriametrics deploy-helm-victoria-logs benchmark run-k6-nginx-vts-docker run-k6-nginx-vts run-k6-angie
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
@@ -22,6 +22,35 @@ output-ips: ## Show VM and cluster IPs
 	@terraform output -raw vm_angie_ip 2>/dev/null && echo " (angie)" || echo "angie: not deployed"
 	@echo "=== K8s ==="
 	@terraform output -raw k8s_cluster_credentials_command 2>/dev/null || echo "K8s: not deployed"
+
+deploy-helm: deploy-helm-victoriametrics deploy-helm-victoria-logs ## Install monitoring/logging Helm charts (run after terraform apply)
+	@echo "=== All Helm charts deployed ==="
+
+deploy-helm-victoriametrics: ## Install VictoriaMetrics k8s-stack (includes operator + CRDs)
+	helm repo add victoriametrics https://victoriametrics.github.io/helm-charts/ || true
+	helm repo update
+	helm upgrade --install victoriametrics \
+	  victoriametrics/victoria-metrics-k8s-stack \
+	  --version 0.87.0 \
+	  --namespace monitoring --create-namespace \
+	  -f ./values/victoriametrics-values.yaml \
+	  --kubeconfig ./.kubeconfig
+
+deploy-helm-victoria-logs: ## Install VictoriaLogs cluster and collector
+	helm repo add victoriametrics https://victoriametrics.github.io/helm-charts/ || true
+	helm repo update
+	helm upgrade --install victoria-logs-cluster \
+	  victoriametrics/victoria-logs-cluster \
+	  --version 0.2.8 \
+	  --namespace victoria-logs-cluster --create-namespace \
+	  -f ./values/victoria-logs-cluster-values.yaml \
+	  --kubeconfig ./.kubeconfig
+	helm upgrade --install victoria-logs-collector \
+	  victoriametrics/victoria-logs-collector \
+	  --version 0.3.7 \
+	  --namespace victoria-logs-cluster \
+	  -f ./values/victoria-logs-collector-values.yaml \
+	  --kubeconfig ./.kubeconfig
 
 benchmark: ## Run all 3 benchmarks sequentially
 	$(MAKE) run-k6-nginx-vts-docker

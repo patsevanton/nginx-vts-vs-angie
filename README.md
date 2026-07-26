@@ -54,11 +54,11 @@ Terraform-конфигурация для сравнительного бенч�
 | `versions.tf` | Провайдеры Terraform (Yandex Cloud, Helm, Kubernetes) |
 | `net.tf` | VPC-сеть и подсети |
 | `ip-dns.tf` | Статический IP, DNS-записи (Grafana, VictoriaLogs, VictoriaMetrics, vlinsert) |
-| `k8s.tf` | K8s-кластер, ноды, Helm-релизы (Ingress, VictoriaMetrics, VictoriaLogs, collector) |
+| `k8s.tf` | K8s-кластер, ноды, Helm-релиз Ingress |
 | `variables.tf` | Переменные (backend_addr, vlinsert_addr) |
 | `benchmark-vms.tf` | 3 VM для nginx-vts-docker, nginx-vts, angie |
 | `benchmark-k8s.tf` | Namespace "benchmark", backend, ConfigMap с k6-скриптом |
-| `benchmark-runners.tf` | k6 Job для каждого ва��ианта |
+| `benchmark-runners.tf` | k6 Job для каждого варианта |
 | `victoriametrics-values.yaml` | Helm values: VictoriaMetrics + Grafana + vmagent |
 | `victoria-logs-cluster-values.yaml` | Helm values: VictoriaLogs cluster + vlinsert ingress |
 | `victoria-logs-collector-values.yaml` | Helm values: лог-коллектор |
@@ -80,13 +80,21 @@ terraform plan
 terraform apply
 ```
 
-### 2. Получение доступа к K8s
+### 2. Установка мониторинга и логирования
+
+После `terraform apply` установите Helm-чарты (VictoriaMetrics, VictoriaLogs):
+
+```bash
+make deploy-helm
+```
+
+### 3. Получение доступа к K8s
 
 ```bash
 $(terraform output -raw k8s_cluster_credentials_command)
 ```
 
-### 3. Запуск бенчмарка
+### 4. Запуск бенчмарка
 
 ```bash
 # Все три варианта последовательно
@@ -98,7 +106,7 @@ make run-k6-nginx-vts
 make run-k6-angie
 ```
 
-### 4. Проверка результатов
+### 5. Проверка результатов
 
 ```bash
 # Статус k6 jobs
@@ -116,7 +124,7 @@ make vm-ssh-nginx-vts
 make vm-ssh-angie
 ```
 
-### 5. Доступ к мониторингу
+### 6. Доступ к мониторингу
 
 - **Grafana**: `http://grafana.apatsev.org.ru`
 - **VictoriaMetrics**: `http://vmselect.apatsev.org.ru`

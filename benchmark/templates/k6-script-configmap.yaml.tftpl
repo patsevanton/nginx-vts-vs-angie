@@ -5,4 +5,4 @@ metadata:
   namespace: ${namespace}
 data:
   benchmark.js: |
-${indent(4, benchmark_js)}
+${indent(4, replace(benchmark_js, "$", "$$"))}

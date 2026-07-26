@@ -67,6 +67,7 @@ resource "null_resource" "kubectl_apply_benchmark" {
 
   depends_on = [
     yandex_kubernetes_cluster.nginx-vts-vs-angie,
+    yandex_kubernetes_node_group.k8s-node-group,
     local_file.benchmark_namespace,
     local_file.benchmark_backend_deployment,
     local_file.benchmark_backend_service,
