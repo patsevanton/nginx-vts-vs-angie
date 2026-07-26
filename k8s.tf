@@ -172,7 +172,7 @@ resource "null_resource" "helm_ingress_nginx" {
     command = <<-EOF
       helm upgrade --install ingress-nginx \
         oci://cr.yandex/yc-marketplace/yandex-cloud/ingress-nginx/chart/ingress-nginx \
-        --version 4.15.1 \
+        --version 4.13.0 \
         --namespace ingress-nginx --create-namespace \
         -f ${local_file.ingress_nginx_values.filename} \
         --kubeconfig ${local.kubeconfig_path}
