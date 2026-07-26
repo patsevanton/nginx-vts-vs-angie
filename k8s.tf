@@ -23,7 +23,7 @@ resource "yandex_kubernetes_cluster" "nginx-vts-vs-angie" {
   network_id = yandex_vpc_network.nginx-vts-vs-angie.id
 
   master {
-    version = "1.32"
+    version = "1.34"
     zonal {
       zone      = yandex_vpc_subnet.nginx-vts-vs-angie-a.zone
       subnet_id = yandex_vpc_subnet.nginx-vts-vs-angie-a.id
@@ -44,7 +44,7 @@ resource "yandex_kubernetes_node_group" "k8s-node-group" {
   description = "Node group for the Managed Service for Kubernetes cluster"
   name        = "k8s-node-group"
   cluster_id  = yandex_kubernetes_cluster.nginx-vts-vs-angie.id
-  version     = "1.32"
+  version     = "1.34"
 
   scale_policy {
     fixed_scale {
@@ -171,7 +171,7 @@ resource "null_resource" "helm_ingress_nginx" {
     command = <<-EOF
       helm upgrade --install ingress-nginx \
         oci://cr.yandex/yc-marketplace/yandex-cloud/ingress-nginx/chart/ingress-nginx \
-        --version 4.13.0 \
+        --version 4.15.1 \
         --namespace ingress-nginx --create-namespace \
         -f ${local_file.ingress_nginx_values.filename} \
         --kubeconfig ${local.kubeconfig_path}
@@ -196,7 +196,7 @@ resource "null_resource" "helm_victoriametrics" {
       helm repo update
       helm upgrade --install victoriametrics \
         victoriametrics/victoria-metrics-k8s-stack \
-        --version 0.41.2 \
+        --version 0.87.0 \
         --namespace monitoring --create-namespace \
         -f ${local_file.victoriametrics_values.filename} \
         --kubeconfig ${local.kubeconfig_path}
@@ -221,7 +221,7 @@ resource "null_resource" "helm_victoria_logs_cluster" {
       helm repo update
       helm upgrade --install victoria-logs-cluster \
         victoriametrics/victoria-logs-cluster \
-        --version 0.0.3 \
+        --version 0.2.8 \
         --namespace victoria-logs-cluster --create-namespace \
         -f ${local_file.victoria_logs_cluster_values.filename} \
         --kubeconfig ${local.kubeconfig_path}
@@ -246,7 +246,7 @@ resource "null_resource" "helm_victoria_logs_collector" {
       helm repo update
       helm upgrade --install victoria-logs-collector \
         victoriametrics/victoria-logs-collector \
-        --version 0.0.1 \
+        --version 0.3.7 \
         --namespace victoria-logs-cluster \
         -f ${local_file.victoria_logs_collector_values.filename} \
         --kubeconfig ${local.kubeconfig_path}

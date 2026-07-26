@@ -153,7 +153,7 @@ write_files:
           restart: unless-stopped
 
         vector:
-          image: timberio/vector:0.43.1-debian
+          image: timberio/vector:0.57.0-debian
           container_name: vector
           volumes:
             - ./vector.toml:/etc/vector/vector.toml:ro
@@ -172,19 +172,19 @@ write_files:
 
   - path: /opt/nginx-vts-docker/Dockerfile
     content: |
-      FROM nginx:1.27-bookworm
+      FROM nginx:1.28-bookworm
 
       RUN apt-get update && apt-get install -y git build-essential libpcre3-dev zlib1g-dev libssl-dev wget && \
           cd /tmp && \
-          wget https://github.com/vozlt/nginx-module-vts/archive/refs/tags/v0.2.2.tar.gz && \
-          tar xzf v0.2.2.tar.gz && \
-          wget https://nginx.org/download/nginx-1.27.4.tar.gz && \
-          tar xzf nginx-1.27.4.tar.gz && \
-          cd nginx-1.27.4 && \
+          wget https://github.com/vozlt/nginx-module-vts/archive/refs/tags/v0.2.5.tar.gz && \
+          tar xzf v0.2.5.tar.gz && \
+          wget https://nginx.org/download/nginx-1.28.3.tar.gz && \
+          tar xzf nginx-1.28.3.tar.gz && \
+          cd nginx-1.28.3 && \
           ./configure --prefix=/etc/nginx --sbin-path=/usr/sbin/nginx --modules-path=/usr/lib64/nginx/modules \
             --conf-path=/etc/nginx/nginx.conf --error-log-path=/var/log/nginx/error.log \
             --http-log-path=/var/log/nginx/access.log --pid-path=/var/run/nginx.pid \
-            --with-compat --add-dynamic-module=/tmp/nginx-module-vts-0.2.2 && \
+            --with-compat --add-dynamic-module=/tmp/nginx-module-vts-0.2.5 && \
           make modules && \
           cp objs/ngx_http_vhost_traffic_status_module.so /usr/lib/nginx/modules/ && \
           apt-get purge -y git build-essential wget && apt-get autoremove -y && \

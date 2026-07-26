@@ -16,10 +16,10 @@ write_files:
       #!/bin/bash
       set -e
       cd /tmp
-      wget -q https://nginx.org/download/nginx-1.27.4.tar.gz
-      tar xzf nginx-1.27.4.tar.gz
-      git clone --depth 1 --branch v0.2.2 https://github.com/vozlt/nginx-module-vts.git
-      cd nginx-1.27.4
+      wget -q https://nginx.org/download/nginx-1.28.3.tar.gz
+      tar xzf nginx-1.28.3.tar.gz
+      git clone --depth 1 --branch v0.2.5 https://github.com/vozlt/nginx-module-vts.git
+      cd nginx-1.28.3
       ./configure \
         --prefix=/etc/nginx \
         --sbin-path=/usr/sbin/nginx \
@@ -38,7 +38,7 @@ write_files:
       cp objs/ngx_http_vhost_traffic_status_module.so /usr/lib/nginx/modules/
       echo "load_module modules/ngx_http_vhost_traffic_status_module.so;" > /etc/nginx/modules-enabled/99-vts.conf
       mkdir -p /etc/nginx/modules-enabled /var/log/nginx
-      rm -rf /tmp/nginx-1.27.4 /tmp/nginx-module-vts /tmp/nginx-1.27.4.tar.gz
+      rm -rf /tmp/nginx-1.28.3 /tmp/nginx-module-vts /tmp/nginx-1.28.3.tar.gz
     permissions: "0755"
 
   - path: /etc/nginx/nginx.conf
