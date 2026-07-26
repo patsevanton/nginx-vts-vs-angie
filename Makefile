@@ -33,8 +33,7 @@ deploy-helm-victoriametrics: ## Install VictoriaMetrics k8s-stack (includes oper
 	  victoriametrics/victoria-metrics-k8s-stack \
 	  --version 0.87.0 \
 	  --namespace monitoring --create-namespace \
-	  -f ./values/victoriametrics-values.yaml \
-	  --kubeconfig ./.kubeconfig
+	  -f ./values/victoriametrics-values.yaml
 
 deploy-helm-victoria-logs: ## Install VictoriaLogs cluster and collector
 	helm repo add victoriametrics https://victoriametrics.github.io/helm-charts/ || true
@@ -43,14 +42,12 @@ deploy-helm-victoria-logs: ## Install VictoriaLogs cluster and collector
 	  victoriametrics/victoria-logs-cluster \
 	  --version 0.2.8 \
 	  --namespace victoria-logs-cluster --create-namespace \
-	  -f ./values/victoria-logs-cluster-values.yaml \
-	  --kubeconfig ./.kubeconfig
+	  -f ./values/victoria-logs-cluster-values.yaml
 	helm upgrade --install victoria-logs-collector \
 	  victoriametrics/victoria-logs-collector \
 	  --version 0.3.7 \
 	  --namespace victoria-logs-cluster \
-	  -f ./values/victoria-logs-collector-values.yaml \
-	  --kubeconfig ./.kubeconfig
+	  -f ./values/victoria-logs-collector-values.yaml
 
 benchmark: ## Run all 3 benchmarks sequentially
 	$(MAKE) run-k6-nginx-vts-docker

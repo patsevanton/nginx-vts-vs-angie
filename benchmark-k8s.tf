@@ -58,7 +58,7 @@ resource "local_file" "benchmark_k6_env" {
 
 output "kubectl_apply_benchmark_command" {
   value = <<-EOT
-    kubectl apply -f ${local_file.benchmark_namespace.filename} --kubeconfig ${local.kubeconfig_path}
-    kubectl apply -f ${local_file.benchmark_backend_deployment.filename} -f ${local_file.benchmark_backend_service.filename} -f ${local_file.benchmark_k6_script.filename} -f ${local_file.benchmark_k6_env.filename} --kubeconfig ${local.kubeconfig_path}
+    kubectl apply -f ${local_file.benchmark_namespace.filename}
+    kubectl apply -f ${local_file.benchmark_backend_deployment.filename} -f ${local_file.benchmark_backend_service.filename} -f ${local_file.benchmark_k6_script.filename} -f ${local_file.benchmark_k6_env.filename}
   EOT
 }

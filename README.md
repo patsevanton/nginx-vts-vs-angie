@@ -80,28 +80,54 @@ terraform plan
 terraform apply
 ```
 
-### 2. Установка мониторинга и логирования
+### 2. Получение доступа к K8s
 
-После `terraform apply` установите Helm-чарты (VictoriaMetrics, VictoriaLogs):
-
-```bash
-make deploy-helm
-```
-
-### 3. Получение доступа к K8s
+После `terraform apply` получите учётные данные кластера (добавляет контекст в `~/.kube/config`):
 
 ```bash
 $(terraform output -raw k8s_cluster_credentials_command)
+```
+
+### 3. Установка мониторинга и логирования
+
+Установите Helm-чарты (VictoriaMetrics, VictoriaLogs):
+
+```bash
+# Добавление Helm-репозитория
+helm repo add victoriametrics https://victoriametrics.github.io/helm-charts/
+helm repo update
+
+# VictoriaMetrics (k8s-stack: vmoperator, vmagent, vmselect, vminsert, Grafana)
+helm upgrade --install victoriametrics \
+  victoriametrics/victoria-metrics-k8s-stack \
+  --version 0.87.0 \
+  --namespace monitoring --create-namespace \
+  -f ./values/victoriametrics-values.yaml
+
+# VictoriaLogs cluster
+helm upgrade --install victoria-logs-cluster \
+  victoriametrics/victoria-logs-cluster \
+  --version 0.2.8 \
+  --namespace victoria-logs-cluster --create-namespace \
+  -f ./values/victoria-logs-cluster-values.yaml
+
+# VictoriaLogs collector (сбор логов с подов)
+helm upgrade --install victoria-logs-collector \
+  victoriametrics/victoria-logs-collector \
+  --version 0.3.7 \
+  --namespace victoria-logs-cluster \
+  -f ./values/victoria-logs-collector-values.yaml
 ```
 
 ### 4. Применение benchmark-манифестов
 
 ```bash
 # Namespace, backend, ConfigMap с k6-скриптом
-$(terraform output -raw kubectl_apply_benchmark_command)
+kubectl apply -f benchmark/manifests/namespace.yaml
+kubectl apply -f benchmark/manifests/backend-deployment.yaml -f benchmark/manifests/backend-service.yaml -f benchmark/manifests/k6-script-configmap.yaml -f benchmark/manifests/k6-env-configmap.yaml
 
 # k6 Jobs
-$(terraform output -raw kubectl_apply_k6_jobs_command)
+kubectl apply -f benchmark/manifests/k6-nginx-vts-docker-job.yaml -f benchmark/manifests/k6-nginx-vts-job.yaml -f benchmark/manifests/k6-angie-job.yaml
 ```
 
 ### 5. Запуск бенчмарка

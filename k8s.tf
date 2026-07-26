@@ -86,8 +86,6 @@ resource "yandex_kubernetes_node_group" "k8s-node-group" {
 }
 
 locals {
-  kubeconfig_path = "${path.module}/.kubeconfig"
-
   ingress_nginx_values = templatefile("${path.module}/values/ingress-nginx-values.yaml.tftpl", {
     loadbalancer_ip = yandex_vpc_address.addr.external_ipv4_address[0].address
   })
@@ -125,35 +123,6 @@ resource "local_file" "victoria_logs_collector_values" {
   content         = local.victoria_logs_collector_values
   filename        = "${path.module}/values/victoria-logs-collector-values.yaml"
   file_permission = "0644"
-}
-
-resource "local_file" "kubeconfig" {
-  content = <<-KUBECONFIG
-apiVersion: v1
-kind: Config
-current-context: nginx-vts-vs-angie
-contexts:
-  - context:
-      cluster: nginx-vts-vs-angie
-      user: yc
-    name: nginx-vts-vs-angie
-clusters:
-  - cluster:
-      certificate-authority-data: ${base64encode(yandex_kubernetes_cluster.nginx-vts-vs-angie.master[0].cluster_ca_certificate)}
-      server: ${yandex_kubernetes_cluster.nginx-vts-vs-angie.master[0].external_v4_endpoint}
-    name: nginx-vts-vs-angie
-users:
-  - name: yc
-    user:
-      exec:
-        apiVersion: client.authentication.k8s.io/v1beta1
-        command: yc
-        args:
-          - k8s
-          - create-token
-KUBECONFIG
-  filename        = local.kubeconfig_path
-  file_permission = "0600"
 }
 
 provider "kubernetes" {

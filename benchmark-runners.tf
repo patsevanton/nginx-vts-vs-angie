@@ -44,6 +44,6 @@ resource "local_file" "benchmark_k6_angie" {
 
 output "kubectl_apply_k6_jobs_command" {
   value = <<-EOT
-    kubectl apply -f ${local_file.benchmark_k6_nginx_vts_docker.filename} -f ${local_file.benchmark_k6_nginx_vts.filename} -f ${local_file.benchmark_k6_angie.filename} --kubeconfig ${local.kubeconfig_path}
+    kubectl apply -f ${local_file.benchmark_k6_nginx_vts_docker.filename} -f ${local_file.benchmark_k6_nginx_vts.filename} -f ${local_file.benchmark_k6_angie.filename}
   EOT
 }
