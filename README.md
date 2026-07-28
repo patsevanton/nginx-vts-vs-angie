@@ -12,11 +12,7 @@ Terraform-конфигурация для сравнительного бенч�
 │                 │     │    + nginx-vts-exporter           │     │  в namespace         │
 │                 │     │    + vector (логи → VictoriaLogs) │     │  "benchmark"         │
 │                 │     │                                  │     │                      │
-│                 │     │  VM2: nginx-vts (native)         │     │                      │
-│                 │     │    + nginx-vts-exporter           │     │                      │
-│                 │     │    + vector (логи → VictoriaLogs) │     │                      │
-│                 │     │                                  │     │                      │
-│                 │     │  VM3: angie                      │     │                      │
+│                 │     │  VM2: angie                      │     │                      │
 │                 │     │    + angie API /api/              │     │                      │
 │                 │     │    + vector (логи → VictoriaLogs) │     │                      │
 └─────────────────┘     └───────────────────��──────────────┘     └──────────────────────┘
@@ -35,7 +31,6 @@ Terraform-конфигурация для сравнительного бенч�
 | Вариант | Описание | Метрики |
 |---------|----------|---------|
 | **nginx-vts-docker** | NGINX + VTS модуль в Docker Compose | nginx-vts-exporter (`:9913`), stub_status, vector (`:9598`) |
-| **nginx-vts** | NGINX + VTS модуль, нативная установка | nginx-vts-exporter (`:9913`), stub_status, vector (`:9598`) |
 | **angie** | Angie, нативная установка | API (`/api/`), vector (`:9598`) |
 
 ## Метрики для сравнения
@@ -56,7 +51,7 @@ Terraform-конфигурация для сравнительного бенч�
 | `ip-dns.tf` | Статический IP, DNS-записи (Grafana, VictoriaLogs, VictoriaMetrics, vlinsert) |
 | `k8s.tf` | K8s-кластер, ноды, Helm-релиз Ingress |
 | `variables.tf` | Переменные (backend_addr, vlinsert_addr) |
-| `benchmark-vms.tf` | 3 VM для nginx-vts-docker, nginx-vts, angie |
+| `benchmark-vms.tf` | 2 VM для nginx-vts-docker, angie |
 | `benchmark-k8s.tf` | Namespace "benchmark", backend, ConfigMap с k6-скриптом |
 | `benchmark-runners.tf` | k6 Job для каждого варианта |
 | `values/victoriametrics-values.yaml` | Helm values: VictoriaMetrics + Grafana + vmagent |
@@ -127,7 +122,7 @@ kubectl apply -f benchmark/manifests/namespace.yaml
 kubectl apply -f benchmark/manifests/backend-deployment.yaml -f benchmark/manifests/backend-service.yaml -f benchmark/manifests/k6-script-configmap.yaml -f benchmark/manifests/k6-env-configmap.yaml
 
 # k6 Jobs
-kubectl apply -f benchmark/manifests/k6-nginx-vts-docker-job.yaml -f benchmark/manifests/k6-nginx-vts-job.yaml -f benchmark/manifests/k6-angie-job.yaml
+kubectl apply -f benchmark/manifests/k6-nginx-vts-docker-job.yaml -f benchmark/manifests/k6-angie-job.yaml
 ```
 
 ### 5. Запуск бенчмарка
@@ -137,11 +132,6 @@ kubectl apply -f benchmark/manifests/k6-nginx-vts-docker-job.yaml -f benchmark/m
 terraform output -raw k8s_cluster_credentials_command | sh > /dev/null 2>&1 || true
 kubectl delete job k6-nginx-vts-docker -n benchmark --ignore-not-found
 kubectl apply -f benchmark/manifests/k6-nginx-vts-docker-job.yaml
-
-# nginx-vts (через 30 сек)
-sleep 30
-kubectl delete job k6-nginx-vts -n benchmark --ignore-not-found
-kubectl apply -f benchmark/manifests/k6-nginx-vts-job.yaml
 
 # angie (через 30 сек)
 sleep 30
@@ -158,11 +148,10 @@ kubectl get pods -n benchmark -l app=k6
 
 # Логи k6
 kubectl logs job/k6-nginx-vts-docker -n benchmark
-kubectl logs job/k6-nginx-vts -n benchmark
 kubectl logs job/k6-angie -n benchmark
 
 # Проверка сервисов на VM
-for name_ip in "nginx-vts-docker:$(terraform output -raw vm_nginx_vts_docker_ip)" "nginx-vts:$(terraform output -raw vm_nginx_vts_ip)" "angie:$(terraform output -raw vm_angie_ip)"; do
+for name_ip in "nginx-vts-docker:$(terraform output -raw vm_nginx_vts_docker_ip)" "angie:$(terraform output -raw vm_angie_ip)"; do
   name="${name_ip%%:*}"; ip="${name_ip##*:}"
   echo "=== $name ($ip) ==="
   echo -n "  HTTP: "; curl -s -o /dev/null -w "%{http_code}" "http://$ip/" || echo "FAIL"; echo ""
@@ -172,7 +161,6 @@ done
 
 # SSH на VM (пользователь ubuntu)
 ssh ubuntu@$(terraform output -raw vm_nginx_vts_docker_ip)
-ssh ubuntu@$(terraform output -raw vm_nginx_vts_ip)
 ssh ubuntu@$(terraform output -raw vm_angie_ip)
 ```
 

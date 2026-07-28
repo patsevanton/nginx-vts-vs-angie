@@ -10,7 +10,6 @@ const throughputBytes = new Trend('throughput_bytes');
 
 const TARGETS = {
   'nginx-vts-docker': __ENV.TARGET_NGINX_VTS_DOCKER || 'localhost',
-  'nginx-vts': __ENV.TARGET_NGINX_VTS || 'localhost',
   'angie': __ENV.TARGET_ANGIE || 'localhost',
 };
 

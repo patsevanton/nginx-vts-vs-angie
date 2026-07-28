@@ -21,7 +21,6 @@ locals {
   benchmark_k6_env_config = templatefile("${path.module}/benchmark/templates/k6-env-configmap.yaml.tftpl", {
     namespace                = local.benchmark_namespace
     target_nginx_vts_docker  = yandex_compute_instance.nginx-vts-docker.network_interface.0.nat_ip_address
-    target_nginx_vts         = yandex_compute_instance.nginx-vts.network_interface.0.nat_ip_address
     target_angie             = yandex_compute_instance.angie.network_interface.0.nat_ip_address
   })
 }

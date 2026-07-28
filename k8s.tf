@@ -92,7 +92,6 @@ locals {
 
   victoriametrics_values = templatefile("${path.module}/values/victoriametrics-values.yaml.tftpl", {
     nginx_vts_docker_ip = yandex_compute_instance.nginx-vts-docker.network_interface.0.nat_ip_address
-    nginx_vts_ip        = yandex_compute_instance.nginx-vts.network_interface.0.nat_ip_address
     angie_ip            = yandex_compute_instance.angie.network_interface.0.nat_ip_address
   })
 
