@@ -1,7 +1,7 @@
 variable "backend_addr" {
   description = "Backend address for proxy upstream (host:port)"
   type        = string
-  default     = "10.0.1.10:8080"
+  default     = "10.0.1.28:30080"
 }
 
 variable "vlinsert_addr" {

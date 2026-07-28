@@ -155,7 +155,11 @@ for name_ip in "nginx-vts-docker:$(terraform output -raw vm_nginx_vts_docker_ip)
   name="${name_ip%%:*}"; ip="${name_ip##*:}"
   echo "=== $name ($ip) ==="
   echo -n "  HTTP: "; curl -s -o /dev/null -w "%{http_code}" "http://$ip/" || echo "FAIL"; echo ""
-  echo -n "  Metrics: "; curl -s -o /dev/null -w "%{http_code}" "http://$ip:9913/metrics" || echo "N/A"; echo ""
+  if [ "$name" = "nginx-vts-docker" ]; then
+    echo -n "  Metrics: "; curl -s -o /dev/null -w "%{http_code}" "http://$ip:9913/metrics" || echo "N/A"; echo ""
+  else
+    echo -n "  API: "; curl -s -o /dev/null -w "%{http_code}" "http://$ip/api/status/" || echo "N/A"; echo ""
+  fi
   echo -n "  Vector: "; curl -s -o /dev/null -w "%{http_code}" "http://$ip:9598/metrics" || echo "N/A"; echo ""
 done
 

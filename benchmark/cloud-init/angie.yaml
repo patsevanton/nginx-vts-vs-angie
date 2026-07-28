@@ -10,7 +10,7 @@ packages:
   - jq
 
 write_files:
-  - path: /etc/angie/nginx.conf
+  - path: /etc/angie/angie.conf
     content: |
       worker_processes auto;
       error_log /var/log/angie/error.log warn;
@@ -39,7 +39,7 @@ write_files:
                   '"http_host":"$http_host",'
                   '"server_protocol":"$server_protocol",'
                   '"request_length":$request_length,'
-                  '"bytes_sent":$bytes_sent
+                  '"bytes_sent":$bytes_sent'
               '}';
 
           access_log /var/log/angie/access.log json_combined;
@@ -56,7 +56,7 @@ write_files:
               }
 
               location /api/ {
-                  api write=off;
+                  api /status/;
               }
 
               location /status.html {
@@ -98,7 +98,12 @@ write_files:
       type = "remap"
       inputs = ["angie_error"]
       source = '''
-      . |= parse_json(.message) ?? { "msg": .message }
+      if is_json(string!(.message)) {
+          parsed, err = parse_json(.message)
+          if err == null && is_object(parsed) { . = merge!(., parsed) } else { .msg = .message }
+      } else {
+          .msg = .message
+      }
       '''
 
       [sinks.victorialogs_access]
@@ -144,6 +149,7 @@ write_files:
     permissions: "0644"
 
 runcmd:
+  - mkdir -p /var/lib/vector
   - curl -fsSL https://angie.software/keys/angie-signing.gpg -o /etc/apt/trusted.gpg.d/angie-signing.gpg
   - echo "deb https://download.angie.software/angie/ubuntu/22.04 jammy main" > /etc/apt/sources.list.d/angie.list
   - apt-get update

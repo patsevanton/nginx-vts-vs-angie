@@ -126,7 +126,7 @@ write_files:
             - "80:80"
             - "9913:9913"
           volumes:
-            - nginx-logs:/var/log/nginx
+            - /var/log/nginx:/var/log/nginx
             - ./nginx.conf:/etc/nginx/nginx.conf:ro
           restart: unless-stopped
 
@@ -136,7 +136,7 @@ write_files:
           command: ["--config", "/etc/vector/vector.toml"]
           volumes:
             - ./vector.toml:/etc/vector/vector.toml:ro
-            - nginx-logs:/var/log/nginx:ro
+            - /var/log/nginx:/var/log/nginx:ro
             - vector-data:/var/lib/vector
           ports:
             - "9598:9598"
@@ -145,7 +145,6 @@ write_files:
           restart: unless-stopped
 
       volumes:
-        nginx-logs:
         vector-data:
     permissions: "0644"
 
@@ -182,7 +181,7 @@ write_files:
     permissions: "0644"
 
 runcmd:
-  - mkdir -p /var/lib/vector
+  - mkdir -p /var/lib/vector /var/log/nginx
   - install -m 0755 -d /etc/apt/keyrings
   - curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
   - chmod a+r /etc/apt/keyrings/docker.gpg
