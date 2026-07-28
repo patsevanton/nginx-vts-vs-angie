@@ -81,10 +81,10 @@ terraform apply
 
 ### 2. Получение доступа к K8s
 
-После успешного `terraform apply` получаем доступ к кластеру:
+После успешного `terraform apply` получаем доступ к кластеру (ID кластера возьмите из вывода `terraform output -raw k8s_cluster_credentials_command` или из консоли Yandex Cloud):
 
 ```bash
-yc managed-kubernetes cluster get-credentials --id $(terraform output -raw k8s_cluster_id) --external --force
+yc managed-kubernetes cluster get-credentials --id <cluster-id> --external --force
 kubectl get nodes
 ```
 
@@ -115,7 +115,7 @@ helm upgrade --install vlcluster \
 helm upgrade --install vlcollector \
   victoriametrics/victoria-logs-collector \
   --version 0.3.7 \
-  --namespace vlcollector \
+  --namespace vlcollector --create-namespace \
   -f ./values/victoria-logs-collector-values.yaml
 ```
 
@@ -136,17 +136,17 @@ kubectl apply -f benchmark/manifests/k6-nginx-vts-docker-job.yaml -f benchmark/m
 # nginx-vts-docker
 terraform output -raw k8s_cluster_credentials_command | sh > /dev/null 2>&1 || true
 kubectl delete job k6-nginx-vts-docker -n benchmark --ignore-not-found
-terraform output -json k6_jobs | jq -r '.["nginx-vts-docker"]' | kubectl apply -f -
+kubectl apply -f benchmark/manifests/k6-nginx-vts-docker-job.yaml
 
 # nginx-vts (через 30 сек)
 sleep 30
 kubectl delete job k6-nginx-vts -n benchmark --ignore-not-found
-terraform output -json k6_jobs | jq -r '.["nginx-vts"]' | kubectl apply -f -
+kubectl apply -f benchmark/manifests/k6-nginx-vts-job.yaml
 
 # angie (через 30 сек)
 sleep 30
 kubectl delete job k6-angie -n benchmark --ignore-not-found
-terraform output -json k6_jobs | jq -r '.["angie"]' | kubectl apply -f -
+kubectl apply -f benchmark/manifests/k6-angie-job.yaml
 ```
 
 ### 6. Проверка результатов
@@ -170,10 +170,10 @@ for name_ip in "nginx-vts-docker:$(terraform output -raw vm_nginx_vts_docker_ip)
   echo -n "  Vector: "; curl -s -o /dev/null -w "%{http_code}" "http://$ip:9598/metrics" || echo "N/A"; echo ""
 done
 
-# SSH на VM
-ssh root@$(terraform output -raw vm_nginx_vts_docker_ip)
-ssh root@$(terraform output -raw vm_nginx_vts_ip)
-ssh root@$(terraform output -raw vm_angie_ip)
+# SSH на VM (пользователь ubuntu)
+ssh ubuntu@$(terraform output -raw vm_nginx_vts_docker_ip)
+ssh ubuntu@$(terraform output -raw vm_nginx_vts_ip)
+ssh ubuntu@$(terraform output -raw vm_angie_ip)
 ```
 
 ### 7. Доступ к мониторингу
