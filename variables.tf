@@ -1,7 +1,7 @@
-variable "backend_addr" {
-  description = "Backend address for proxy upstream (host:port)"
-  type        = string
-  default     = "10.0.1.28:30080"
+variable "backend_nodeport" {
+  description = "NodePort of the benchmark backend service"
+  type        = number
+  default     = 30080
 }
 
 variable "vlinsert_addr" {

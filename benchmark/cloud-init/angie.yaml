@@ -13,16 +13,19 @@ write_files:
   - path: /etc/angie/angie.conf
     content: |
       worker_processes auto;
+      worker_rlimit_nofile 65535;
       error_log /var/log/angie/error.log warn;
       pid /var/run/angie.pid;
 
       events {
-          worker_connections 1024;
+          worker_connections 4096;
+          multi_accept on;
       }
 
       http {
           include       /etc/angie/mime.types;
           default_type  application/octet-stream;
+          # mime.types устанавливается пакетом angie; если отсутствует, будет создан в runcmd
 
           log_format json_combined escape=json
               '{'
@@ -44,12 +47,19 @@ write_files:
 
           access_log /var/log/angie/access.log json_combined;
 
+          upstream backend {
+              server ${backend_addr};
+              keepalive 64;
+          }
+
           server {
               listen 80;
               server_name _;
 
               location / {
-                  proxy_pass http://${backend_addr};
+                  proxy_pass http://backend;
+                  proxy_http_version 1.1;
+                  proxy_set_header Connection "";
                   proxy_set_header Host $host;
                   proxy_set_header X-Real-IP $remote_addr;
                   proxy_set_header X-Request-ID $request_id;
@@ -153,8 +163,12 @@ runcmd:
   - curl -fsSL https://angie.software/keys/angie-signing.gpg -o /etc/apt/trusted.gpg.d/angie-signing.gpg
   - echo "deb https://download.angie.software/angie/ubuntu/22.04 jammy main" > /etc/apt/sources.list.d/angie.list
   - apt-get update
-  - apt-get install -y angie
+  # Сохраняем наш /etc/angie/angie.conf при установке пакета (избегаем интерактивного conffile prompt)
+  - apt-get install -y -o Dpkg::Options::="--force-confold" angie
   - mkdir -p /var/log/angie
+  # mime.types может отсутствовать, если dpkg не завершил конфигурацию — завершаем вручную
+  - test -f /etc/angie/mime.types || cp /etc/angie/mime.types.dpkg-new /etc/angie/mime.types
+  - dpkg --configure -a
   - systemctl enable angie
   - systemctl start angie
   - wget -q https://packages.timber.io/vector/0.57.0/vector-0.57.0-x86_64-unknown-linux-gnu.tar.gz -O /tmp/vector.tar.gz
