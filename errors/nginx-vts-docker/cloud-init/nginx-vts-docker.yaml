@@ -26,23 +26,7 @@ write_files:
           include       /etc/nginx/mime.types;
           default_type  application/octet-stream;
 
-          log_format json_combined escape=json
-              '{'
-                  '"ts":"$time_iso8601",'
-                  '"remote_addr":"$remote_addr",'
-                  '"request_method":"$request_method",'
-                  '"request_uri":"$request_uri",'
-                  '"status":$status,'
-                  '"body_bytes_sent":$body_bytes_sent,'
-                  '"request_time":$request_time,'
-                  '"upstream_response_time":"$upstream_response_time",'
-                  '"upstream_addr":"$upstream_addr",'
-                  '"http_user_agent":"$http_user_agent",'
-                  '"http_host":"$http_host",'
-                  '"server_protocol":"$server_protocol",'
-                  '"request_length":$request_length,'
-                  '"bytes_sent":$bytes_sent
-              '}';
+          log_format json_combined escape=json '{"ts":"$time_iso8601","remote_addr":"$remote_addr","request_method":"$request_method","request_uri":"$request_uri","status":$status,"body_bytes_sent":$body_bytes_sent,"request_time":$request_time,"upstream_response_time":"$upstream_response_time","upstream_addr":"$upstream_addr","http_user_agent":"$http_user_agent","http_host":"$http_host","server_protocol":"$server_protocol","request_length":$request_length,"bytes_sent":$bytes_sent}';
 
           access_log /var/log/nginx/access.log json_combined;
 
@@ -97,7 +81,12 @@ write_files:
       type = "remap"
       inputs = ["nginx_error"]
       source = '''
-      . |= parse_json(.message) ?? { "msg": .message }
+      if is_json(string!(.message)) {
+          parsed, err = parse_json(.message)
+          if err == null && is_object(parsed) { . = merge!(., parsed) } else { .msg = .message }
+      } else {
+          .msg = .message
+      }
       '''
 
       [sinks.victorialogs_access]
@@ -144,6 +133,7 @@ write_files:
         vector:
           image: timberio/vector:0.57.0-debian
           container_name: vector
+          command: ["--config", "/etc/vector/vector.toml"]
           volumes:
             - ./vector.toml:/etc/vector/vector.toml:ro
             - nginx-logs:/var/log/nginx:ro
@@ -192,6 +182,7 @@ write_files:
     permissions: "0644"
 
 runcmd:
+  - mkdir -p /var/lib/vector
   - install -m 0755 -d /etc/apt/keyrings
   - curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
   - chmod a+r /etc/apt/keyrings/docker.gpg
