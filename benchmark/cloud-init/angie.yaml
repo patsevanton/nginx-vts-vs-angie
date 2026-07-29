@@ -24,6 +24,7 @@ write_files:
 
       http {
           include       /etc/angie/mime.types;
+          include       /etc/angie/prometheus_all.conf;
           default_type  application/octet-stream;
           # mime.types устанавливается пакетом angie; если отсутствует, будет создан в runcmd
 
@@ -48,6 +49,7 @@ write_files:
           access_log /var/log/angie/access.log json_combined;
 
           upstream backend {
+              zone upstream_backend 64k;
               server ${backend_addr};
               keepalive 64;
           }
@@ -55,6 +57,8 @@ write_files:
           server {
               listen 80;
               server_name _;
+
+              status_zone server_zone;
 
               location / {
                   proxy_pass http://backend;
@@ -67,6 +71,10 @@ write_files:
 
               location /api/ {
                   api /status/;
+              }
+
+              location = /metrics {
+                  prometheus all;
               }
 
               location /status.html {
@@ -102,34 +110,42 @@ write_files:
       inputs = ["angie_access"]
       source = '''
       . = parse_json!(.message)
+      .instance = "angie"
+      .msg = join!([string(.request_method) ?? "-", string(.request_uri) ?? "-", string(.status) ?? "-"], " ")
       '''
 
       [transforms.parse_error]
       type = "remap"
       inputs = ["angie_error"]
       source = '''
+      .instance = "angie"
       if is_json(string!(.message)) {
           parsed, err = parse_json(.message)
-          if err == null && is_object(parsed) { . = merge!(., parsed) } else { .msg = .message }
-      } else {
-          .msg = .message
+          if err == null && is_object(parsed) { . = merge!(., parsed) }
       }
+      .msg = .message
       '''
 
       [sinks.victorialogs_access]
       type = "http"
       inputs = ["parse_access"]
-      uri = "http://${vlinsert_addr}/insert/jsonline?_stream_fields=instance,_msg_field=msg&_time_field=ts"
+      uri = "http://${vlinsert_addr}/insert/jsonline?_stream_fields=instance&_msg_field=msg&_time_field=ts"
       method = "post"
       encoding.codec = "json"
+      framing.method = "newline_delimited"
+      batch.max_bytes = 900000
+      batch.timeout_secs = 2
       healthcheck.enabled = false
 
       [sinks.victorialogs_error]
       type = "http"
       inputs = ["parse_error"]
-      uri = "http://${vlinsert_addr}/insert/jsonline?_stream_fields=instance,_msg_field=msg&_time_field=ts"
+      uri = "http://${vlinsert_addr}/insert/jsonline?_stream_fields=instance&_msg_field=msg&_time_field=ts"
       method = "post"
       encoding.codec = "json"
+      framing.method = "newline_delimited"
+      batch.max_bytes = 900000
+      batch.timeout_secs = 2
       healthcheck.enabled = false
 
       [sources.vector_metrics]

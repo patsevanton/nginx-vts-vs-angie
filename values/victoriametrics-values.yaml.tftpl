@@ -10,7 +10,7 @@ grafana:
     ingressClassName: nginx
     enabled: true
     hosts:
-      - grafana.apatsev.org.ru
+      - grafana.${lb_ip}.sslip.io
     annotations:
       nginx.ingress.kubernetes.io/ssl-redirect: "false"
 
@@ -32,7 +32,7 @@ vmsingle:
     annotations:
       nginx.ingress.kubernetes.io/ssl-redirect: "false"
     hosts:
-      - vmselect.apatsev.org.ru
+      - vmselect.${lb_ip}.sslip.io
 
 kubeControllerManager:
   enabled: false
@@ -62,14 +62,14 @@ extraObjects:
                 variant: "nginx-vts-docker"
                 instance: "nginx-vts-docker"
           metrics_path: /metrics
-        - job_name: "angie-api"
+        - job_name: "angie-prometheus"
           scrape_interval: 15s
           static_configs:
             - targets: ["${angie_ip}:80"]
               labels:
                 variant: "angie"
                 instance: "angie"
-          metrics_path: /api/status/format/prometheus
+          metrics_path: /metrics
         - job_name: "vector-metrics-docker"
           scrape_interval: 15s
           static_configs:

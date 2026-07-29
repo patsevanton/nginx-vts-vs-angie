@@ -7,5 +7,5 @@ variable "backend_nodeport" {
 variable "vlinsert_addr" {
   description = "VictoriaLogs vlinsert address (host:port)"
   type        = string
-  default     = "vlinsert.apatsev.org.ru:80"
+  default     = "vlinsert.89.169.132.222.sslip.io:80"
 }

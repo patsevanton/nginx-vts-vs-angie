@@ -84,34 +84,42 @@ write_files:
       inputs = ["nginx_access"]
       source = '''
       . = parse_json!(.message)
+      .instance = "nginx-vts-docker"
+      .msg = join!([string(.request_method) ?? "-", string(.request_uri) ?? "-", string(.status) ?? "-"], " ")
       '''
 
       [transforms.parse_error]
       type = "remap"
       inputs = ["nginx_error"]
       source = '''
+      .instance = "nginx-vts-docker"
       if is_json(string!(.message)) {
           parsed, err = parse_json(.message)
-          if err == null && is_object(parsed) { . = merge!(., parsed) } else { .msg = .message }
-      } else {
-          .msg = .message
+          if err == null && is_object(parsed) { . = merge!(., parsed) }
       }
+      .msg = .message
       '''
 
       [sinks.victorialogs_access]
       type = "http"
       inputs = ["parse_access"]
-      uri = "http://${vlinsert_addr}/insert/jsonline?_stream_fields=instance,_msg_field=msg&_time_field=ts"
+      uri = "http://${vlinsert_addr}/insert/jsonline?_stream_fields=instance&_msg_field=msg&_time_field=ts"
       method = "post"
       encoding.codec = "json"
+      framing.method = "newline_delimited"
+      batch.max_bytes = 900000
+      batch.timeout_secs = 2
       healthcheck.enabled = false
 
       [sinks.victorialogs_error]
       type = "http"
       inputs = ["parse_error"]
-      uri = "http://${vlinsert_addr}/insert/jsonline?_stream_fields=instance,_msg_field=msg&_time_field=ts"
+      uri = "http://${vlinsert_addr}/insert/jsonline?_stream_fields=instance&_msg_field=msg&_time_field=ts"
       method = "post"
       encoding.codec = "json"
+      framing.method = "newline_delimited"
+      batch.max_bytes = 900000
+      batch.timeout_secs = 2
       healthcheck.enabled = false
 
       [sources.vector_metrics]

@@ -4,7 +4,7 @@ vlselect:
   ingress:
     enabled: true
     hosts:
-      - name: victorialogs.apatsev.org.ru
+      - name: victorialogs.${lb_ip}.sslip.io
         path:
           - /
         port: http
@@ -16,7 +16,7 @@ vlinsert:
   ingress:
     enabled: true
     hosts:
-      - name: vlinsert.apatsev.org.ru
+      - name: vlinsert.${lb_ip}.sslip.io
         path:
           - /
         port: http

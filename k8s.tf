@@ -93,9 +93,12 @@ locals {
   victoriametrics_values = templatefile("${path.module}/values/victoriametrics-values.yaml.tftpl", {
     nginx_vts_docker_ip = yandex_compute_instance.nginx-vts-docker.network_interface.0.nat_ip_address
     angie_ip            = yandex_compute_instance.angie.network_interface.0.nat_ip_address
+    lb_ip               = yandex_vpc_address.addr.external_ipv4_address[0].address
   })
 
-  victoria_logs_cluster_values = templatefile("${path.module}/values/victoria-logs-cluster-values.yaml.tftpl", {})
+  victoria_logs_cluster_values = templatefile("${path.module}/values/victoria-logs-cluster-values.yaml.tftpl", {
+    lb_ip = yandex_vpc_address.addr.external_ipv4_address[0].address
+  })
 
   victoria_logs_collector_values = templatefile("${path.module}/values/victoria-logs-collector-values.yaml.tftpl", {})
 }

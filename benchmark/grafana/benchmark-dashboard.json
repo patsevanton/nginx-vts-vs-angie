@@ -10,19 +10,27 @@
         "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
         "targets": [
           {
-            "expr": "sum by (variant) (rate(nginx_vts_requests_total{variant=~\".*\"}[1m]))",
-            "legendFormat": "{{variant}}"
+            "expr": "sum(rate(nginx_server_requests{variant=\"nginx-vts-docker\",host=~\".*\"}[1m]))",
+            "legendFormat": "nginx-vts-docker"
+          },
+          {
+            "expr": "sum(rate(angie_http_server_zones_requests_total{variant=\"angie\"}[1m]))",
+            "legendFormat": "angie"
           }
         ]
       },
       {
-        "title": "Response Time P95 by Variant",
+        "title": "Active Connections",
         "type": "timeseries",
         "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
         "targets": [
           {
-            "expr": "histogram_quantile(0.95, sum by (le, variant) (rate(nginx_vts_request_duration_seconds_bucket[5m])))",
-            "legendFormat": "{{variant}} p95"
+            "expr": "sum(nginx_server_connections{variant=\"nginx-vts-docker\",status=\"active\"})",
+            "legendFormat": "nginx-vts-docker"
+          },
+          {
+            "expr": "sum(angie_connections_active{variant=\"angie\"})",
+            "legendFormat": "angie"
           }
         ]
       },
@@ -32,8 +40,12 @@
         "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
         "targets": [
           {
-            "expr": "sum by (variant) (rate(nginx_vts_bytes_total{direction=\"in\"}[1m]))",
-            "legendFormat": "{{variant}} bytes_in/s"
+            "expr": "sum(rate(nginx_server_bytes{variant=\"nginx-vts-docker\",direction=\"in\"}[1m]))",
+            "legendFormat": "nginx-vts-docker bytes_in/s"
+          },
+          {
+            "expr": "sum(rate(angie_http_server_zones_data_received{variant=\"angie\"}[1m]))",
+            "legendFormat": "angie bytes_in/s"
           }
         ]
       },
@@ -43,30 +55,38 @@
         "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
         "targets": [
           {
-            "expr": "sum by (variant) (rate(nginx_vts_bytes_total{direction=\"out\"}[1m]))",
-            "legendFormat": "{{variant}} bytes_out/s"
+            "expr": "sum(rate(nginx_server_bytes{variant=\"nginx-vts-docker\",direction=\"out\"}[1m]))",
+            "legendFormat": "nginx-vts-docker bytes_out/s"
+          },
+          {
+            "expr": "sum(rate(angie_http_server_zones_data_sent{variant=\"angie\"}[1m]))",
+            "legendFormat": "angie bytes_out/s"
           }
         ]
       },
       {
-        "title": "HTTP Status Codes by Variant",
+        "title": "HTTP 2xx Responses (rate)",
         "type": "timeseries",
         "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
         "targets": [
           {
-            "expr": "sum by (variant, status) (rate(nginx_vts_requests_total[1m]))",
-            "legendFormat": "{{variant}} {{status}}"
+            "expr": "sum(rate(nginx_server_requests{variant=\"nginx-vts-docker\",code=\"2xx\"}[1m]))",
+            "legendFormat": "nginx-vts-docker 2xx"
+          },
+          {
+            "expr": "sum(rate(angie_http_server_zones_responses{variant=\"angie\",code=~\"2..\"}[1m]))",
+            "legendFormat": "angie 2xx"
           }
         ]
       },
       {
-        "title": "CPU Usage by Variant",
+        "title": "Upstream Response Time (avg, ms)",
         "type": "timeseries",
         "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
         "targets": [
           {
-            "expr": "rate(process_cpu_seconds_total{job=~\"nginx-vts-exporter|angie-api\", variant=~\".*\"}[1m])",
-            "legendFormat": "{{variant}} cpu"
+            "expr": "sum(rate(nginx_upstream_responseMsec{variant=\"nginx-vts-docker\"}[1m])) / sum(rate(nginx_upstream_requests{variant=\"nginx-vts-docker\"}[1m]))",
+            "legendFormat": "nginx-vts-docker"
           }
         ]
       },
@@ -76,18 +96,18 @@
         "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
         "targets": [
           {
-            "expr": "sum by (variant) (rate(vector_events_in_total{component=~\".*\"}[1m]))",
+            "expr": "sum by (variant) (rate(vector_component_received_events_total{variant=~\".*\"}[1m]))",
             "legendFormat": "{{variant}} events/s"
           }
         ]
       },
       {
-        "title": "Vector Processed Bytes",
+        "title": "Vector Sent Bytes (to VictoriaLogs)",
         "type": "timeseries",
         "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
         "targets": [
           {
-            "expr": "sum by (variant) (rate(vector_processed_bytes_total[1m]))",
+            "expr": "sum by (variant) (rate(vector_component_sent_bytes_total{variant=~\".*\"}[1m]))",
             "legendFormat": "{{variant}} bytes/s"
           }
         ]
