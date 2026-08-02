@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: benchmark-dashboard
+  namespace: ${namespace}
+  labels:
+    grafana_dashboard: "1"
+data:
+  benchmark-dashboard.json: |-
+    ${indent(4, dashboard_json)}

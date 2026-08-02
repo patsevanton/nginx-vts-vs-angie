@@ -53,17 +53,17 @@
 
 | Feature | Реализация |
 |---|---|
-| Базовый сервер | Голый **nginx 1.28** из исходников (`nginx.org/download/nginx-1.28.0.tar.gz`) |
-| Модуль метрик | **Сторонний** `nginx-module-vts` v0.2.5 — собирается как dynamic-модуль (`--add-dynamic-module`) и подключается через `load_module` |
+| Базовый сервер | Голый **nginx 1.31.3** (mainline) из исходников (`nginx.org/download/nginx-1.31.3.tar.gz`), базовый образ `nginx:1.31.3-trixie` (Debian 13 trixie, PCRE2) |
+| Модуль метрик | **Сторонний** `nginx-module-vts` v0.2.6 — собирается как dynamic-модуль (`--add-dynamic-module`) и подключается через `load_module` |
 | Экспорт в Prometheus | **Внешний sidecar-экспортёр** `nginx-vts-exporter` v0.10.8 (отдельный Go-бинарник, слушает `:9913`), парсит JSON-статус с `http://127.0.0.1:80/status` |
 | Поставка | **Docker Compose** — nginx собирается из Dockerfile, рядом контейнер vector; всё изолированно, но образ нужно собирать (`docker compose up -d --build`) |
 | Endpoint статуса | `/status` — JSON (формат VTS) |
 | Web-консоль | **Нет** — только JSON `/status` и текстовый `/stub_status` |
 | Количество метрик | ~12 метрик `nginx_*` (server, upstream, cache) |
-| Зависимости | Docker, git, build-essential, libpcre3-dev, zlib1g-dev, libssl-dev — для сборки модуля на VM |
+| Зависимости | Docker, git, build-essential, libpcre2-dev, zlib1g-dev, libssl-dev — для сборки модуля на VM |
 | Обновление | Пересборка Docker-образа при выходе новой версии nginx/VTS-модуля |
 
-> Ключевой недостаток — сторонний модуль VTS [не обновлялся с 2021 года](https://github.com/vozlt/nginx-module-vts), его нужно собирать под каждую версию nginx, а экспортёр — отдельный процесс, который может упасть независимо от nginx.
+> Ключевой недостаток — сторонний модуль VTS нужно собирать под каждую версию nginx, а экспортёр — отдельный процесс, который может упасть независимо от nginx. VTS v0.2.6 (июль 2026) [возобновил поддержку](https://github.com/vozlt/nginx-module-vts/releases/tag/v0.2.6): правки безопасности (buffer overflow, XSS), совместимость с nginx 1.30+, React-фронтенд статусной страницы.
 
 ### angie
 
@@ -145,7 +145,7 @@ helm repo update
 helm upgrade --install vmks \
   victoriametrics/victoria-metrics-k8s-stack \
   --version 0.87.0 \
-  --namespace vmks \
+  --namespace vmks --create-namespace \
   -f ./values/victoriametrics-values.yaml
 
 # VictoriaLogs cluster
@@ -161,6 +161,12 @@ helm upgrade --install vlcollector \
   --version 0.3.7 \
   --namespace vlcollector --create-namespace \
   -f ./values/victoria-logs-collector-values.yaml
+```
+
+После установки `vmks` примените ConfigMap с Grafana-дашбордом (namespace `vmks` уже создан Helm'ом выше, файл сгенерирован Terraform):
+
+```bash
+kubectl apply -f benchmark/manifests/benchmark-dashboard-configmap.yaml
 ```
 
 ### 4. Применение benchmark-манифестов
@@ -233,7 +239,7 @@ terraform output grafana_admin_password_command    # команда для по�
 
 ### Готовый дашборд в Grafana
 
-Дашборд **«Nginx-VTS vs Angie Benchmark»** (27 панелей + 2 row-разделителя) провизирован в Grafana **автоматически** при `terraform apply` — через ConfigMap `benchmark-dashboard` (namespace `vmks`, лейбл `grafana_dashboard: "1"`), который подхватывает sidecar `grafana-sc-dashboard` чарта `vmks`. Ручной импорт не требуется.
+Дашборд **«Nginx-VTS vs Angie Benchmark»** (27 панелей + 2 row-разделителя) применяется в Grafana через ConfigMap `benchmark-dashboard` (namespace `vmks`, лейбл `grafana_dashboard: "1"`, файл `benchmark/manifests/benchmark-dashboard-configmap.yaml`), который подхватывает sidecar `grafana-sc-dashboard` чарта `vmks`. Файл манифеста генерируется Terraform из шаблона `benchmark/templates/benchmark-dashboard-configmap.yaml.tftpl`; команда применения выводится в `terraform output kubectl_apply_dashboard_command` и продублирована на шаге 3. Ручной импорт через JSON не требуется.
 
 Дашборд разбит на три секции:
 
@@ -320,10 +326,10 @@ Remap-трансформы добавляют поле `instance` (stream label)
 
 ## Особенность сборки nginx-vts-docker (Docker Hub mirror)
 
-cloud-init VM `nginx-vts-docker` собирает образ `nginx:1.28-bookworm` и тянет `timberio/vector:0.57.0-debian` с Docker Hub. Иногда `production.cloudfront.docker.com` (CDN Docker Hub) отдаёт `i/o timeout` из сети Yandex Cloud — cloud-init падает на `docker compose up`, и сервисы на VM не поднимаются. Чтобы этого избежать, в `benchmark/cloud-init/nginx-vts-docker.yaml`:
+cloud-init VM `nginx-vts-docker` собирает образ `nginx:1.31.3-trixie` и тянет `timberio/vector:0.57.0-debian` с Docker Hub. Иногда `production.cloudfront.docker.com` (CDN Docker Hub) отдаёт `i/o timeout` из сети Yandex Cloud — cloud-init падает на `docker compose up`, и сервисы на VM не поднимаются. Чтобы этого избежать, в `benchmark/cloud-init/nginx-vts-docker.yaml`:
 
 1. **`/etc/docker/daemon.json`** с `"registry-mirrors": ["https://mirror.gcr.io"]` — Docker тянет образы через публичный mirror `mirror.gcr.io` (Google), который стабильно доступен из Yandex Cloud и кэширует Docker Hub.
-2. **Retry `docker pull`** для `timberio/vector:0.57.0-debian` и `nginx:1.28-bookworm` (5 попыток с паузой 10с) + повторный `docker compose up --build`, если первый запуск не поднял контейнер `nginx-vts`.
+2. **Retry `docker pull`** для `timberio/vector:0.57.0-debian` и `nginx:1.31.3-trixie` (5 попыток с паузой 10с) + повторный `docker compose up --build`, если первый запуск не поднял контейнер `nginx-vts`.
 
 Проверено из VM Yandex Cloud: `mirror.gcr.io/v2/timberio/vector/manifests/0.57.0-debian` → `HTTP 200` (тогда как прямой `registry-1.docker.io` периодически таймаутит).
 

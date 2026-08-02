@@ -185,27 +185,20 @@ output "grafana_admin_password_command" {
   value       = "kubectl get secret vmks-grafana -n vmks -o jsonpath='{.data.admin-password}' | base64 -d && echo"
 }
 
-resource "kubernetes_namespace_v1" "vmks" {
-  metadata {
-    name = "vmks"
-  }
+locals {
+  benchmark_dashboard_configmap = templatefile("${path.module}/benchmark/templates/benchmark-dashboard-configmap.yaml.tftpl", {
+    namespace       = "vmks"
+    dashboard_json  = file("${path.module}/benchmark/grafana/benchmark-dashboard.json")
+  })
 }
 
-resource "kubernetes_config_map_v1" "benchmark_dashboard" {
-  metadata {
-    name      = "benchmark-dashboard"
-    namespace = kubernetes_namespace_v1.vmks.metadata[0].name
-    labels = {
-      grafana_dashboard = "1"
-    }
-  }
+resource "local_file" "benchmark_dashboard_configmap" {
+  content         = local.benchmark_dashboard_configmap
+  filename        = "${path.module}/benchmark/manifests/benchmark-dashboard-configmap.yaml"
+  file_permission = "0644"
+}
 
-  data = {
-    "benchmark-dashboard.json" = file("${path.module}/benchmark/grafana/benchmark-dashboard.json")
-  }
-
-  depends_on = [
-    yandex_kubernetes_cluster.nginx-vts-vs-angie,
-    yandex_kubernetes_node_group.k8s-node-group,
-  ]
+output "kubectl_apply_dashboard_command" {
+  description = "Команда для применения ConfigMap дашборда в namespace vmks (после helm install vmks на шаге 3)"
+  value       = "kubectl apply -f ${local_file.benchmark_dashboard_configmap.filename}"
 }

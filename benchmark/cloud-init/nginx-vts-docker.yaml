@@ -167,19 +167,19 @@ write_files:
 
   - path: /opt/nginx-vts-docker/Dockerfile
     content: |
-      FROM nginx:1.28-bookworm
+      FROM nginx:1.31.3-trixie
 
-      RUN apt-get update && apt-get install -y git build-essential libpcre3-dev zlib1g-dev libssl-dev wget && \
+      RUN apt-get update && apt-get install -y git build-essential libpcre2-dev zlib1g-dev libssl-dev wget && \
           cd /tmp && \
-          wget https://github.com/vozlt/nginx-module-vts/archive/refs/tags/v0.2.5.tar.gz && \
-          tar xzf v0.2.5.tar.gz && \
-          wget https://nginx.org/download/nginx-1.28.0.tar.gz && \
-          tar xzf nginx-1.28.0.tar.gz && \
-          cd nginx-1.28.0 && \
+          wget https://github.com/vozlt/nginx-module-vts/archive/refs/tags/v0.2.6.tar.gz && \
+          tar xzf v0.2.6.tar.gz && \
+          wget https://nginx.org/download/nginx-1.31.3.tar.gz && \
+          tar xzf nginx-1.31.3.tar.gz && \
+          cd nginx-1.31.3 && \
           ./configure --prefix=/etc/nginx --sbin-path=/usr/sbin/nginx --modules-path=/usr/lib/nginx/modules \
             --conf-path=/etc/nginx/nginx.conf --error-log-path=/var/log/nginx/error.log \
             --http-log-path=/var/log/nginx/access.log --pid-path=/var/run/nginx.pid \
-            --with-compat --add-dynamic-module=/tmp/nginx-module-vts-0.2.5 && \
+            --with-compat --add-dynamic-module=/tmp/nginx-module-vts-0.2.6 && \
           make modules && \
           mkdir -p /etc/nginx/modules && \
           cp objs/ngx_http_vhost_traffic_status_module.so /etc/nginx/modules/ && \
@@ -218,7 +218,7 @@ runcmd:
   - |
     if ! docker ps --format '{{.Names}}' | grep -q '^nginx-vts$'; then
       echo "Initial compose up failed; retrying with explicit pulls via mirror.gcr.io"
-      for img in timberio/vector:0.57.0-debian nginx:1.28-bookworm; do
+      for img in timberio/vector:0.57.0-debian nginx:1.31.3-trixie; do
         for i in 1 2 3 4 5; do
           docker pull "$img" && break || { echo "pull $img attempt $i failed"; sleep 10; }
         done
