@@ -145,7 +145,7 @@ helm repo update
 helm upgrade --install vmks \
   victoriametrics/victoria-metrics-k8s-stack \
   --version 0.87.0 \
-  --namespace vmks --create-namespace \
+  --namespace vmks \
   -f ./values/victoriametrics-values.yaml
 
 # VictoriaLogs cluster

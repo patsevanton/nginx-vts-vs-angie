@@ -185,10 +185,16 @@ output "grafana_admin_password_command" {
   value       = "kubectl get secret vmks-grafana -n vmks -o jsonpath='{.data.admin-password}' | base64 -d && echo"
 }
 
+resource "kubernetes_namespace_v1" "vmks" {
+  metadata {
+    name = "vmks"
+  }
+}
+
 resource "kubernetes_config_map_v1" "benchmark_dashboard" {
   metadata {
     name      = "benchmark-dashboard"
-    namespace = "vmks"
+    namespace = kubernetes_namespace_v1.vmks.metadata[0].name
     labels = {
       grafana_dashboard = "1"
     }
@@ -197,4 +203,9 @@ resource "kubernetes_config_map_v1" "benchmark_dashboard" {
   data = {
     "benchmark-dashboard.json" = file("${path.module}/benchmark/grafana/benchmark-dashboard.json")
   }
+
+  depends_on = [
+    yandex_kubernetes_cluster.nginx-vts-vs-angie,
+    yandex_kubernetes_node_group.k8s-node-group,
+  ]
 }
