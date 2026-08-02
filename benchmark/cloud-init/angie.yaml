@@ -80,6 +80,16 @@ write_files:
               location /status.html {
                   stub_status;
               }
+
+              location /console/ {
+                  auto_redirect on;
+                  alias /usr/share/angie-console-light/html/;
+                  index index.html;
+
+                  location /console/api/ {
+                      api /status/;
+                  }
+              }
           }
       }
     permissions: "0644"
@@ -180,7 +190,7 @@ runcmd:
   - echo "deb https://download.angie.software/angie/ubuntu/22.04 jammy main" > /etc/apt/sources.list.d/angie.list
   - apt-get update
   # Сохраняем наш /etc/angie/angie.conf при установке пакета (избегаем интерактивного conffile prompt)
-  - apt-get install -y -o Dpkg::Options::="--force-confold" angie
+  - apt-get install -y -o Dpkg::Options::="--force-confold" angie angie-console-light
   - mkdir -p /var/log/angie
   # mime.types может отсутствовать, если dpkg не завершил конфигурацию — завершаем вручную
   - test -f /etc/angie/mime.types || cp /etc/angie/mime.types.dpkg-new /etc/angie/mime.types

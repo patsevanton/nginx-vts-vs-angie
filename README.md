@@ -45,6 +45,43 @@
 | **nginx-vts-docker** | NGINX + VTS модуль в Docker Compose | nginx-vts-exporter (`:9913/metrics`), vector (`:9598`) |
 | **angie** | Angie, нативная установка (deb-пакет) | **встроенный** Prometheus (`:80/metrics` через `prometheus_all.conf`), API (`/api/`), vector (`:9598`) |
 
+## Отличительные features каждого варианта
+
+Два варианта сопоставимы по производительности (см. «Ключевые результаты»), но принципиально различаются способом получения метрик, поставкой и наличием визуальной консоли.
+
+### nginx-vts-docker
+
+| Feature | Реализация |
+|---|---|
+| Базовый сервер | Голый **nginx 1.28** из исходников (`nginx.org/download/nginx-1.28.0.tar.gz`) |
+| Модуль метрик | **Сторонний** `nginx-module-vts` v0.2.5 — собирается как dynamic-модуль (`--add-dynamic-module`) и подключается через `load_module` |
+| Экспорт в Prometheus | **Внешний sidecar-экспортёр** `nginx-vts-exporter` v0.10.8 (отдельный Go-бинарник, слушает `:9913`), парсит JSON-статус с `http://127.0.0.1:80/status` |
+| Поставка | **Docker Compose** — nginx собирается из Dockerfile, рядом контейнер vector; всё изолированно, но образ нужно собирать (`docker compose up -d --build`) |
+| Endpoint статуса | `/status` — JSON (формат VTS) |
+| Web-консоль | **Нет** — только JSON `/status` и текстовый `/stub_status` |
+| Количество метрик | ~12 метрик `nginx_*` (server, upstream, cache) |
+| Зависимости | Docker, git, build-essential, libpcre3-dev, zlib1g-dev, libssl-dev — для сборки модуля на VM |
+| Обновление | Пересборка Docker-образа при выходе новой версии nginx/VTS-модуля |
+
+> Ключевой недостаток — сторонний модуль VTS [не обновлялся с 2021 года](https://github.com/vozlt/nginx-module-vts), его нужно собирать под каждую версию nginx, а экспортёр — отдельный процесс, который может упасть независимо от nginx.
+
+### angie
+
+| Feature | Реализация |
+|---|---|
+| Базовый сервер | **Angie** — форк nginx от «Веб-Сервера», устанавливается deb-пакетом из репозитория `download.angie.software` |
+| Модуль метрик | **Нативный** `http_prometheus` — входит в поставку Angie, подключается одной строкой `include /etc/angie/prometheus_all.conf` |
+| Экспорт в Prometheus | **Без отдельного экспортёра** — метрики отдаёт сам Angie на `:80/metrics` (`prometheus all;`), отдельный процесс не нужен |
+| Поставка | **deb-пакет** (`apt-get install angie`) — без Docker, без сборки, без управления зависимостями компилятора |
+| Endpoint статуса | `/api/` — REST API (`api /status/`, JSON-дерево `/status/connections/`, `/status/http/server_zones/`, `/status/http/upstreams/` и т.д.), `/metrics` — Prometheus, `/status.html` — `stub_status` |
+| Web-консоль | **[Console Light](https://angie.software/angie/docs/configuration/monitoring/)** — отдельный пакет `angie-console-light`, ставится через `apt-get install angie-console-light`, отдаётся на `/console/` через `alias /usr/share/angie-console-light/html/`. В реальном времени показывает connections, server zones, upstreams, caches, SSL; в бенчмарке устанавливается в `cloud-init/angie.yaml` (доступна по `http://<angie_ip>/console/`) |
+| Количество метрик | ~45 метрик `angie_*` (connections, server_zones, upstreams, slabs, caches и др.) «из коробки» |
+| Сбор статистики | Через shared-memory зоны: `zone upstream_backend 64k` в `upstream` и `status_zone server_zone` в `server` — обязательны для сбора |
+| Зависимости | Только deb-пакет angie + angie-console-light — всё из репозитория, без компиляции |
+| Обновление | `apt-get upgrade angie angie-console-light` — обновление одной командой |
+
+> Ключевое преимущество Angie — метрики «из коробки» (нативный Prometheus + REST API + визуальная Console Light) без сборки модулей и sidecar-экспортёров. Ключевое преимущество nginx-vts — независимость от форка (можно взять любой nginx и добавить модуль VTS).
+
 ## Метрики для сравнения
 
 | Категория | Метрика | Источник |
@@ -160,7 +197,15 @@ for name_ip in "nginx-vts-docker:$(terraform output -raw vm_nginx_vts_docker_ip)
   echo -n "  HTTP: "; curl -s -o /dev/null -w "%{http_code}" "http://$ip/" || echo "FAIL"; echo ""
   echo -n "  Metrics: "; curl -s -o /dev/null -w "%{http_code}" "http://$ip:9913/metrics" 2>/dev/null || curl -s -o /dev/null -w "%{http_code}" "http://$ip/metrics"; echo ""
   echo -n "  Vector: "; curl -s -o /dev/null -w "%{http_code}" "http://$ip:9598/metrics" || echo "N/A"; echo ""
+  echo -n "  Status/API: "; curl -s -o /dev/null -w "%{http_code}" "http://$ip/status" 2>/dev/null || curl -s -o /dev/null -w "%{http_code}" "http://$ip/api/"; echo ""
 done
+
+# Web-консоль Angie (Console Light) — открывается в браузере
+# (после terraform apply с обновлённым cloud-init; HTTP 200 + HTML отдаёт Console Light,
+#  а не backend — последний отвечает "OK" на любой путь через location /)
+ANGIE_IP=$(terraform output -raw vm_angie_ip)
+curl -s -o /dev/null -w "Angie Console Light: HTTP %{http_code}\n" "http://$ANGIE_IP/console/"
+echo "Открыть в браузере: http://$ANGIE_IP/console/"
 
 # SSH на VM (пользователь ubuntu)
 ssh ubuntu@$(terraform output -raw vm_nginx_vts_docker_ip)
@@ -175,6 +220,16 @@ ssh ubuntu@$(terraform output -raw vm_angie_ip)
 - **VictoriaMetrics**: `http://vmselect.<LB_IP>.sslip.io`
 - **VictoriaLogs**: `http://victorialogs.<LB_IP>.sslip.io`
 - **vlinsert**: `http://vlinsert.<LB_IP>.sslip.io`
+
+URL Grafana, логин и команда для получения пароля выводятся в `terraform output` (пароль автогенерируется helm-чартом `vmks` на шаге 3, поэтому Terraform возвращает команду `kubectl`, а не сам пароль):
+
+```bash
+terraform output grafana_url
+terraform output grafana_admin_user
+terraform output grafana_admin_password_command    # команда для получения пароля из Secret vmks-grafana
+```
+
+> Логин: `admin`. Пароль — из Secret `vmks-grafana` (ключ `admin-password`), извлекается одной командой из `terraform output grafana_admin_password_command`.
 
 > sslip.io — бесплатный wildcard-DNS: `<anything>.<IP>.sslip.io` всегда резолвится в `<IP>`. Не требует делегирования доменной зоны.
 
@@ -202,6 +257,24 @@ http {
 ```
 
 Это даёт ~45 метрик `angie_*` (connections, server_zones, upstreams, slabs, caches и др.) без внешних экспортеров. vmagent scrape'ит `http://<angie_ip>/metrics`.
+
+### Web-консоль Angie Console Light
+
+Помимо API и метрик, Angie имеет визуальную консоль [Console Light](https://angie.software/angie/docs/configuration/monitoring/) — отдельный пакет `angie-console-light`, который в бенчмарке ставится через `apt-get install angie-console-light` в `cloud-init/angie.yaml`. Консоль отдаётся на `/console/`:
+
+```nginx
+location /console/ {
+    auto_redirect on;
+    alias /usr/share/angie-console-light/html/;
+    index index.html;
+
+    location /console/api/ {
+        api /status/;
+    }
+}
+```
+
+Консоль доступна в браузере по `http://<angie_ip>/console/` (без аутентификации — в этом бенчмарке `auth_basic` намеренно не включён, т.к. IP VM публичный только на время замера; для production добавьте `auth_basic`). У nginx-vts аналога нет — только JSON `/status`.
 
 ## Особенности доставки логов (vector → VictoriaLogs)
 

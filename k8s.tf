@@ -168,3 +168,18 @@ resource "helm_release" "ingress_nginx" {
 output "k8s_cluster_credentials_command" {
   value = "yc managed-kubernetes cluster get-credentials --id ${yandex_kubernetes_cluster.nginx-vts-vs-angie.id} --external --force"
 }
+
+output "grafana_url" {
+  description = "URL Grafana (сформирован через sslip.io из публичного IP балансировщика ingress-nginx)"
+  value       = "http://grafana.${yandex_vpc_address.addr.external_ipv4_address[0].address}.sslip.io"
+}
+
+output "grafana_admin_user" {
+  description = "Логин администратора Grafana (дефолт чарта victoria-metrics-k8s-stack)"
+  value       = "admin"
+}
+
+output "grafana_admin_password_command" {
+  description = "Команда для получения пароля администратора Grafana из Secret (пароль автогенерируется helm-чартом vmks при установке на шаге 3)"
+  value       = "kubectl get secret vmks-grafana -n vmks -o jsonpath='{.data.admin-password}' | base64 -d && echo"
+}
