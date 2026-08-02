@@ -18,12 +18,12 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(nginx_server_requests{variant=\"nginx-vts-docker\",host=\"*\",code=\"total\"}[1m]))",
+          "expr": "sum(rate(nginx_server_requests{variant=~\"$variant\",host=~\"$vhost\",code=\"total\"}[1m]))",
           "legendFormat": "nginx-vts-docker",
           "refId": "N"
         },
         {
-          "expr": "sum(rate(angie_http_server_zones_requests_total{variant=\"angie\"}[1m]))",
+          "expr": "sum(rate(angie_http_server_zones_requests_total{variant=~\"$variant\",zone=~\"$vhost\"}[1m]))",
           "legendFormat": "angie",
           "refId": "A"
         }
@@ -44,12 +44,12 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(nginx_server_bytes{host=\"*\",variant=\"nginx-vts-docker\",direction=\"in\"}[1m]))",
+          "expr": "sum(rate(nginx_server_bytes{host=~\"$vhost\",variant=~\"$variant\",direction=\"in\"}[1m]))",
           "legendFormat": "nginx-vts-docker bytes_in/s",
           "refId": "N"
         },
         {
-          "expr": "sum(rate(angie_http_server_zones_data_received{variant=\"angie\"}[1m]))",
+          "expr": "sum(rate(angie_http_server_zones_data_received{variant=~\"$variant\",zone=~\"$vhost\"}[1m]))",
           "legendFormat": "angie bytes_in/s",
           "refId": "A"
         }
@@ -75,12 +75,12 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(nginx_server_bytes{host=\"*\",variant=\"nginx-vts-docker\",direction=\"out\"}[1m]))",
+          "expr": "sum(rate(nginx_server_bytes{host=~\"$vhost\",variant=~\"$variant\",direction=\"out\"}[1m]))",
           "legendFormat": "nginx-vts-docker bytes_out/s",
           "refId": "N"
         },
         {
-          "expr": "sum(rate(angie_http_server_zones_data_sent{variant=\"angie\"}[1m]))",
+          "expr": "sum(rate(angie_http_server_zones_data_sent{variant=~\"$variant\",zone=~\"$vhost\"}[1m]))",
           "legendFormat": "angie bytes_out/s",
           "refId": "A"
         }
@@ -106,12 +106,12 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(nginx_upstream_responseMsec{variant=\"nginx-vts-docker\"}[1m])) / sum(rate(nginx_upstream_requests{variant=\"nginx-vts-docker\"}[1m]))",
+          "expr": "sum(rate(nginx_upstream_responseMsec{variant=~\"$variant\"}[1m])) / sum(rate(nginx_upstream_requests{variant=~\"$variant\"}[1m]))",
           "legendFormat": "nginx-vts-docker",
           "refId": "N"
         },
         {
-          "expr": "avg(nginx_upstream_requestMsec{variant=\"nginx-vts-docker\"})",
+          "expr": "avg(nginx_upstream_requestMsec{variant=~\"$variant\"})",
           "legendFormat": "nginx-vts requestMsec",
           "refId": "R"
         }
@@ -138,7 +138,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (variant) (rate(vector_component_received_events_total{variant=~\".*\"}[1m]))",
+          "expr": "sum by (variant) (rate(vector_component_received_events_total{variant=~\"$variant\"}[1m]))",
           "legendFormat": "{{variant}} events/s",
           "refId": "{"
         }
@@ -159,7 +159,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (variant) (rate(vector_component_sent_bytes_total{variant=~\".*\"}[1m]))",
+          "expr": "sum by (variant) (rate(vector_component_sent_bytes_total{variant=~\"$variant\"}[1m]))",
           "legendFormat": "{{variant}} bytes/s",
           "refId": "{"
         }
@@ -201,22 +201,22 @@
       },
       "targets": [
         {
-          "expr": "sum(nginx_server_connections{variant=\"nginx-vts-docker\",status=\"active\"})",
+          "expr": "sum(nginx_server_connections{variant=~\"$variant\",status=\"active\"})",
           "legendFormat": "active",
           "refId": "A"
         },
         {
-          "expr": "sum(nginx_server_connections{variant=\"nginx-vts-docker\",status=\"reading\"})",
+          "expr": "sum(nginx_server_connections{variant=~\"$variant\",status=\"reading\"})",
           "legendFormat": "reading",
           "refId": "R"
         },
         {
-          "expr": "sum(nginx_server_connections{variant=\"nginx-vts-docker\",status=\"writing\"})",
+          "expr": "sum(nginx_server_connections{variant=~\"$variant\",status=\"writing\"})",
           "legendFormat": "writing",
           "refId": "W"
         },
         {
-          "expr": "sum(nginx_server_connections{variant=\"nginx-vts-docker\",status=\"waiting\"})",
+          "expr": "sum(nginx_server_connections{variant=~\"$variant\",status=\"waiting\"})",
           "legendFormat": "waiting",
           "refId": "D"
         }
@@ -238,17 +238,17 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(nginx_server_connections{variant=\"nginx-vts-docker\",status=\"accepted\"}[1m]))",
+          "expr": "sum(rate(nginx_server_connections{variant=~\"$variant\",status=\"accepted\"}[1m]))",
           "legendFormat": "accepted/s",
           "refId": "A"
         },
         {
-          "expr": "sum(rate(nginx_server_connections{variant=\"nginx-vts-docker\",status=\"handled\"}[1m]))",
+          "expr": "sum(rate(nginx_server_connections{variant=~\"$variant\",status=\"handled\"}[1m]))",
           "legendFormat": "handled/s",
           "refId": "H"
         },
         {
-          "expr": "sum(rate(nginx_server_connections{variant=\"nginx-vts-docker\",status=\"requests\"}[1m]))",
+          "expr": "sum(rate(nginx_server_connections{variant=~\"$variant\",status=\"requests\"}[1m]))",
           "legendFormat": "requests/s",
           "refId": "R"
         }
@@ -270,7 +270,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (status) (rate(nginx_server_cache{variant=\"nginx-vts-docker\",host=\"*\"}[1m]))",
+          "expr": "sum by (status) (rate(nginx_server_cache{variant=~\"$variant\",host=~\"$vhost\"}[1m]))",
           "legendFormat": "{{status}}/s",
           "refId": "{"
         }
@@ -292,7 +292,7 @@
       },
       "targets": [
         {
-          "expr": "avg(nginx_server_requestMsec{variant=\"nginx-vts-docker\",host=\"*\"})",
+          "expr": "avg(nginx_server_requestMsec{variant=~\"$variant\",host=~\"$vhost\"})",
           "legendFormat": "nginx-vts-docker",
           "refId": "N"
         }
@@ -319,7 +319,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (code) (rate(nginx_server_requests{variant=\"nginx-vts-docker\",host=\"*\",code!=\"total\"}[1m]))",
+          "expr": "sum by (code) (rate(nginx_server_requests{variant=~\"$variant\",host=~\"$vhost\",code!=\"total\"}[1m]))",
           "legendFormat": "{{code}}/s",
           "refId": "{"
         }
@@ -341,7 +341,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (direction) (rate(nginx_upstream_bytes{variant=\"nginx-vts-docker\"}[1m]))",
+          "expr": "sum by (direction) (rate(nginx_upstream_bytes{variant=~\"$variant\"}[1m]))",
           "legendFormat": "{{direction}}/s",
           "refId": "{"
         }
@@ -367,7 +367,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (code) (rate(nginx_upstream_requests{variant=\"nginx-vts-docker\"}[1m]))",
+          "expr": "sum by (code) (rate(nginx_upstream_requests{variant=~\"$variant\"}[1m]))",
           "legendFormat": "{{code}}/s",
           "refId": "{"
         }
@@ -388,7 +388,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (memstat) (nginx_server_sharedzones{variant=\"nginx-vts-docker\"})",
+          "expr": "sum by (memstat) (nginx_server_sharedzones{variant=~\"$variant\"})",
           "legendFormat": "{{memstat}}",
           "refId": "{"
         }
@@ -426,12 +426,12 @@
       },
       "targets": [
         {
-          "expr": "sum(angie_connections_active{variant=\"angie\"})",
+          "expr": "sum(angie_connections_active{variant=~\"$variant\"})",
           "legendFormat": "active",
           "refId": "A"
         },
         {
-          "expr": "sum(angie_connections_idle{variant=\"angie\"})",
+          "expr": "sum(angie_connections_idle{variant=~\"$variant\"})",
           "legendFormat": "idle",
           "refId": "I"
         }
@@ -453,12 +453,12 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(angie_connections_accepted{variant=\"angie\"}[1m]))",
+          "expr": "sum(rate(angie_connections_accepted{variant=~\"$variant\"}[1m]))",
           "legendFormat": "accepted/s",
           "refId": "A"
         },
         {
-          "expr": "sum(rate(angie_connections_dropped{variant=\"angie\"}[1m]))",
+          "expr": "sum(rate(angie_connections_dropped{variant=~\"$variant\"}[1m]))",
           "legendFormat": "dropped/s",
           "refId": "D"
         }
@@ -480,17 +480,17 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(angie_http_server_zones_requests_total{variant=\"angie\"}[1m]))",
+          "expr": "sum(rate(angie_http_server_zones_requests_total{variant=~\"$variant\",zone=~\"$vhost\"}[1m]))",
           "legendFormat": "total/s",
           "refId": "T"
         },
         {
-          "expr": "sum(angie_http_server_zones_requests_processing{variant=\"angie\"})",
+          "expr": "sum(angie_http_server_zones_requests_processing{variant=~\"$variant\",zone=~\"$vhost\"})",
           "legendFormat": "processing",
           "refId": "P"
         },
         {
-          "expr": "sum(rate(angie_http_server_zones_requests_discarded{variant=\"angie\"}[1m]))",
+          "expr": "sum(rate(angie_http_server_zones_requests_discarded{variant=~\"$variant\",zone=~\"$vhost\"}[1m]))",
           "legendFormat": "discarded/s",
           "refId": "D"
         }
@@ -512,7 +512,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (code) (rate(angie_http_server_zones_responses{variant=\"angie\"}[1m]))",
+          "expr": "sum by (code) (rate(angie_http_server_zones_responses{variant=~\"$variant\",zone=~\"$vhost\"}[1m]))",
           "legendFormat": "{{code}}/s",
           "refId": "{"
         }
@@ -533,7 +533,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (upstream) (angie_http_upstreams_keepalive{variant=\"angie\"})",
+          "expr": "sum by (upstream) (angie_http_upstreams_keepalive{variant=~\"$variant\"})",
           "legendFormat": "{{upstream}}",
           "refId": "{"
         }
@@ -555,7 +555,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (peer) (angie_http_upstreams_peers_state{variant=\"angie\"})",
+          "expr": "sum by (peer) (angie_http_upstreams_peers_state{variant=~\"$variant\"})",
           "legendFormat": "{{peer}}",
           "refId": "{"
         }
@@ -577,12 +577,12 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(angie_http_upstreams_peers_data_received{variant=\"angie\"}[1m]))",
+          "expr": "sum(rate(angie_http_upstreams_peers_data_received{variant=~\"$variant\"}[1m]))",
           "legendFormat": "received/s",
           "refId": "R"
         },
         {
-          "expr": "sum(rate(angie_http_upstreams_peers_data_sent{variant=\"angie\"}[1m]))",
+          "expr": "sum(rate(angie_http_upstreams_peers_data_sent{variant=~\"$variant\"}[1m]))",
           "legendFormat": "sent/s",
           "refId": "S"
         }
@@ -608,7 +608,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (code) (rate(angie_http_upstreams_peers_responses{variant=\"angie\"}[1m]))",
+          "expr": "sum by (code) (rate(angie_http_upstreams_peers_responses{variant=~\"$variant\"}[1m]))",
           "legendFormat": "{{code}}/s",
           "refId": "{"
         }
@@ -629,17 +629,17 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(angie_http_upstreams_peers_health_fails{variant=\"angie\"}[1m]))",
+          "expr": "sum(rate(angie_http_upstreams_peers_health_fails{variant=~\"$variant\"}[1m]))",
           "legendFormat": "fails/s",
           "refId": "F"
         },
         {
-          "expr": "sum(rate(angie_http_upstreams_peers_health_unavailable{variant=\"angie\"}[1m]))",
+          "expr": "sum(rate(angie_http_upstreams_peers_health_unavailable{variant=~\"$variant\"}[1m]))",
           "legendFormat": "unavailable/s",
           "refId": "U"
         },
         {
-          "expr": "sum(angie_http_upstreams_peers_health_downtime{variant=\"angie\"})",
+          "expr": "sum(angie_http_upstreams_peers_health_downtime{variant=~\"$variant\"})",
           "legendFormat": "downtime (s)",
           "refId": "D"
         }
@@ -661,12 +661,12 @@
       },
       "targets": [
         {
-          "expr": "sum(angie_http_upstreams_peers_selected_current{variant=\"angie\"})",
+          "expr": "sum(angie_http_upstreams_peers_selected_current{variant=~\"$variant\"})",
           "legendFormat": "current",
           "refId": "C"
         },
         {
-          "expr": "sum(rate(angie_http_upstreams_peers_selected_total{variant=\"angie\"}[1m]))",
+          "expr": "sum(rate(angie_http_upstreams_peers_selected_total{variant=~\"$variant\"}[1m]))",
           "legendFormat": "total/s",
           "refId": "T"
         }
@@ -688,12 +688,12 @@
       },
       "targets": [
         {
-          "expr": "sum(angie_slabs_pages_free{variant=\"angie\"})",
+          "expr": "sum(angie_slabs_pages_free{variant=~\"$variant\"})",
           "legendFormat": "free",
           "refId": "F"
         },
         {
-          "expr": "sum(angie_slabs_pages_used{variant=\"angie\"})",
+          "expr": "sum(angie_slabs_pages_used{variant=~\"$variant\"})",
           "legendFormat": "used",
           "refId": "U"
         }
@@ -715,12 +715,12 @@
       },
       "targets": [
         {
-          "expr": "sum by (size) (angie_slabs_pages_slots_used{variant=\"angie\"})",
+          "expr": "sum by (size) (angie_slabs_pages_slots_used{variant=~\"$variant\"})",
           "legendFormat": "used {{size}}",
           "refId": "U"
         },
         {
-          "expr": "sum by (size) (angie_slabs_pages_slots_free{variant=\"angie\"})",
+          "expr": "sum by (size) (angie_slabs_pages_slots_free{variant=~\"$variant\"})",
           "legendFormat": "free {{size}}",
           "refId": "F"
         }
@@ -742,12 +742,12 @@
       },
       "targets": [
         {
-          "expr": "sum by (size) (rate(angie_slabs_pages_slots_reqs{variant=\"angie\"}[1m]))",
+          "expr": "sum by (size) (rate(angie_slabs_pages_slots_reqs{variant=~\"$variant\"}[1m]))",
           "legendFormat": "reqs {{size}}/s",
           "refId": "R"
         },
         {
-          "expr": "sum by (size) (rate(angie_slabs_pages_slots_fails{variant=\"angie\"}[1m]))",
+          "expr": "sum by (size) (rate(angie_slabs_pages_slots_fails{variant=~\"$variant\"}[1m]))",
           "legendFormat": "fails {{size}}/s",
           "refId": "F"
         }
@@ -763,6 +763,50 @@
   "time": {
     "from": "now-30m",
     "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "variant",
+        "type": "query",
+        "label": "Variant",
+        "description": "Прокси-вариант: nginx-vts-docker или angie (лейбл variant из метрик)",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "VictoriaMetrics"
+        },
+        "query": "label_values(variant)",
+        "refresh": 1,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        }
+      },
+      {
+        "name": "vhost",
+        "type": "query",
+        "label": "VHost (host/zone)",
+        "description": "Виртуальный хост: лейбл host для nginx-vts, zone для angie (server_name/Host запроса)",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "VictoriaMetrics"
+        },
+        "query": "label_values(nginx_server_requests{variant=~\"$variant\"}, host) or label_values(angie_http_server_zones_requests_total{variant=~\"$variant\",zone=~\"$vhost\"}, zone)",
+        "refresh": 1,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        }
+      }
+    ]
   },
   "uid": "nginx-vts-vs-angie-benchmark",
   "schemaVersion": 39,

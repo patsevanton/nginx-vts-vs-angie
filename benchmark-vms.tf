@@ -7,6 +7,9 @@ locals {
   node_addresses       = data.kubernetes_nodes.nodes.nodes[0].status[0].addresses
   k8s_node_internal_ip = [for a in local.node_addresses : a.address if a.type == "InternalIP"][0]
   backend_addr         = "${local.k8s_node_internal_ip}:${var.backend_nodeport}"
+  # Публичный адрес vlinsert для vector на VM. Берём из текущего IP балансировщика,
+  # чтобы при пересоздании IP Terraform'ом cloud-init всегда получал актуальный host.
+  vlinsert_addr        = "vlinsert.${yandex_vpc_address.addr.external_ipv4_address[0].address}.sslip.io:80"
 }
 
 resource "yandex_compute_instance" "nginx-vts-docker" {
@@ -40,7 +43,7 @@ resource "yandex_compute_instance" "nginx-vts-docker" {
     ssh-keys  = "ubuntu:${file("~/.ssh/id_ed25519.pub")}"
     user-data = templatefile("${path.module}/benchmark/cloud-init/nginx-vts-docker.yaml", {
       backend_addr  = local.backend_addr
-      vlinsert_addr = var.vlinsert_addr
+      vlinsert_addr = local.vlinsert_addr
     })
   }
 }
@@ -76,7 +79,7 @@ resource "yandex_compute_instance" "angie" {
     ssh-keys  = "ubuntu:${file("~/.ssh/id_ed25519.pub")}"
     user-data = templatefile("${path.module}/benchmark/cloud-init/angie.yaml", {
       backend_addr  = local.backend_addr
-      vlinsert_addr = var.vlinsert_addr
+      vlinsert_addr = local.vlinsert_addr
     })
   }
 }

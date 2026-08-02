@@ -23,7 +23,7 @@ resource "yandex_kubernetes_cluster" "nginx-vts-vs-angie" {
   network_id = yandex_vpc_network.nginx-vts-vs-angie.id
 
   master {
-    version = "1.34"
+    version = "1.33"
     zonal {
       zone      = yandex_vpc_subnet.nginx-vts-vs-angie-a.zone
       subnet_id = yandex_vpc_subnet.nginx-vts-vs-angie-a.id
@@ -44,7 +44,7 @@ resource "yandex_kubernetes_node_group" "k8s-node-group" {
   description = "Node group for the Managed Service for Kubernetes cluster"
   name        = "k8s-node-group"
   cluster_id  = yandex_kubernetes_cluster.nginx-vts-vs-angie.id
-  version     = "1.34"
+  version     = "1.33"
 
   scale_policy {
     fixed_scale {

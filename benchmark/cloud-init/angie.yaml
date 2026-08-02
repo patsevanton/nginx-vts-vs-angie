@@ -58,7 +58,8 @@ write_files:
               listen 80;
               server_name _;
 
-              status_zone server_zone;
+              # Имя зоны статистики = Host запроса -> лейбл zone=<host> в angie_http_server_zones_*
+              status_zone $host;
 
               location / {
                   proxy_pass http://backend;

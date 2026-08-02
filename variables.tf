@@ -4,8 +4,8 @@ variable "backend_nodeport" {
   default     = 30080
 }
 
-variable "vlinsert_addr" {
-  description = "VictoriaLogs vlinsert address (host:port)"
-  type        = string
-  default     = "vlinsert.89.169.132.222.sslip.io:80"
-}
+# vlinsert_addr не задаётся переменной — он вычисляется в locals из текущего
+# публичного IP балансировщика (yandex_vpc_address.addr), чтобы cloud-init
+# всегда получал актуальный адрес. hardcoded default убран: при пересоздании
+# статического IP Terraform'ом старый адрес становился недействительным,
+# и vector на VM шлёл логи в никуда.
