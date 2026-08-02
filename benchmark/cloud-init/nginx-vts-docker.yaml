@@ -197,6 +197,13 @@ write_files:
       CMD ["sh", "-c", "nginx-vts-exporter -nginx.scrape_uri=http://127.0.0.1:80/status/format/json -telemetry.address=:9913 & nginx -g 'daemon off;'"]
     permissions: "0644"
 
+  - path: /etc/docker/daemon.json
+    content: |
+      {
+        "registry-mirrors": ["https://mirror.gcr.io"]
+      }
+    permissions: "0644"
+
 runcmd:
   - mkdir -p /var/lib/vector /var/log/nginx
   - install -m 0755 -d /etc/apt/keyrings
@@ -207,4 +214,14 @@ runcmd:
   - apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
   - systemctl enable docker
   - systemctl start docker
-  - docker compose -f /opt/nginx-vts-docker/docker-compose.yml up -d
+  - docker compose -f /opt/nginx-vts-docker/docker-compose.yml up -d --build
+  - |
+    if ! docker ps --format '{{.Names}}' | grep -q '^nginx-vts$'; then
+      echo "Initial compose up failed; retrying with explicit pulls via mirror.gcr.io"
+      for img in timberio/vector:0.57.0-debian nginx:1.28-bookworm; do
+        for i in 1 2 3 4 5; do
+          docker pull "$img" && break || { echo "pull $img attempt $i failed"; sleep 10; }
+        done
+      done
+      docker compose -f /opt/nginx-vts-docker/docker-compose.yml up -d --build
+    fi
