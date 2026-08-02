@@ -94,6 +94,7 @@ locals {
     nginx_vts_docker_ip = yandex_compute_instance.nginx-vts-docker.network_interface.0.nat_ip_address
     angie_ip            = yandex_compute_instance.angie.network_interface.0.nat_ip_address
     lb_ip               = yandex_vpc_address.addr.external_ipv4_address[0].address
+    path_module         = path.module
   })
 
   victoria_logs_cluster_values = templatefile("${path.module}/values/victoria-logs-cluster-values.yaml.tftpl", {
@@ -182,4 +183,18 @@ output "grafana_admin_user" {
 output "grafana_admin_password_command" {
   description = "Команда для получения пароля администратора Grafana из Secret (пароль автогенерируется helm-чартом vmks при установке на шаге 3)"
   value       = "kubectl get secret vmks-grafana -n vmks -o jsonpath='{.data.admin-password}' | base64 -d && echo"
+}
+
+resource "kubernetes_config_map_v1" "benchmark_dashboard" {
+  metadata {
+    name      = "benchmark-dashboard"
+    namespace = "vmks"
+    labels = {
+      grafana_dashboard = "1"
+    }
+  }
+
+  data = {
+    "benchmark-dashboard.json" = file("${path.module}/benchmark/grafana/benchmark-dashboard.json")
+  }
 }

@@ -88,3 +88,8 @@ output "vm_nginx_vts_docker_ip" {
 output "vm_angie_ip" {
   value = yandex_compute_instance.angie.network_interface.0.nat_ip_address
 }
+
+output "angie_console_url" {
+  value       = "http://angie-console.${yandex_compute_instance.angie.network_interface.0.nat_ip_address}.sslip.io/console/"
+  description = "Angie Console Light (Web UI мониторинга Angie, домен через sslip.io из публичного IP VM Angie)"
+}

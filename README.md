@@ -74,7 +74,7 @@
 | Экспорт в Prometheus | **Без отдельного экспортёра** — метрики отдаёт сам Angie на `:80/metrics` (`prometheus all;`), отдельный процесс не нужен |
 | Поставка | **deb-пакет** (`apt-get install angie`) — без Docker, без сборки, без управления зависимостями компилятора |
 | Endpoint статуса | `/api/` — REST API (`api /status/`, JSON-дерево `/status/connections/`, `/status/http/server_zones/`, `/status/http/upstreams/` и т.д.), `/metrics` — Prometheus, `/status.html` — `stub_status` |
-| Web-консоль | **[Console Light](https://angie.software/angie/docs/configuration/monitoring/)** — отдельный пакет `angie-console-light`, ставится через `apt-get install angie-console-light`, отдаётся на `/console/` через `alias /usr/share/angie-console-light/html/`. В реальном времени показывает connections, server zones, upstreams, caches, SSL; в бенчмарке устанавливается в `cloud-init/angie.yaml` (доступна по `http://<angie_ip>/console/`) |
+| Web-консоль | **[Console Light](https://angie.software/angie/docs/configuration/monitoring/)** — отдельный пакет `angie-console-light`, ставится через `apt-get install angie-console-light`, отдаётся на `/console/` через `alias /usr/share/angie-console-light/html/`. В реальном времени показывает connections, server zones, upstreams, caches, SSL; в бенчмарке устанавливается в `cloud-init/angie.yaml` (доступна по `http://angie-console.<angie_ip>.sslip.io/console/`, URL выводится в `terraform output angie_console_url`) |
 | Количество метрик | ~45 метрик `angie_*` (connections, server_zones, upstreams, slabs, caches и др.) «из коробки» |
 | Сбор статистики | Через shared-memory зоны: `zone upstream_backend 64k` в `upstream` и `status_zone server_zone` в `server` — обязательны для сбора |
 | Зависимости | Только deb-пакет angie + angie-console-light — всё из репозитория, без компиляции |
@@ -204,8 +204,8 @@ done
 # (после terraform apply с обновлённым cloud-init; HTTP 200 + HTML отдаёт Console Light,
 #  а не backend — последний отвечает "OK" на любой путь через location /)
 ANGIE_IP=$(terraform output -raw vm_angie_ip)
-curl -s -o /dev/null -w "Angie Console Light: HTTP %{http_code}\n" "http://$ANGIE_IP/console/"
-echo "Открыть в браузере: http://$ANGIE_IP/console/"
+curl -s -o /dev/null -w "Angie Console Light: HTTP %{http_code}\n" "http://angie-console.$ANGIE_IP.sslip.io/console/"
+echo "Открыть в браузере: http://angie-console.$ANGIE_IP.sslip.io/console/"
 
 # SSH на VM (пользователь ubuntu)
 ssh ubuntu@$(terraform output -raw vm_nginx_vts_docker_ip)
@@ -230,6 +230,38 @@ terraform output grafana_admin_password_command    # команда для по�
 ```
 
 > Логин: `admin`. Пароль — из Secret `vmks-grafana` (ключ `admin-password`), извлекается одной командой из `terraform output grafana_admin_password_command`.
+
+### Готовый дашборд в Grafana
+
+Дашборд **«Nginx-VTS vs Angie Benchmark»** (31 панель + 2 row-разделителя) провизирован в Grafana **автоматически** при `terraform apply` — через ConfigMap `benchmark-dashboard` (namespace `vmks`, лейбл `grafana_dashboard: "1"`), который подхватывает sidecar `grafana-sc-dashboard` чарта `vmks`. Ручной импорт не требуется.
+
+Дашборд разбит на три секции:
+
+1. **Сравнение (8 панелей)** — RPS по вариантам, активные соединения, входящий/исходящий трафик, HTTP 2xx responses, upstream response time, метрики vector. Парные запросы nginx-vts и angie на одной панели для сопоставления.
+2. **nginx-vts-docker — детали метрик (11 панелей)** — все 12 метрик `nginx_*`: состояния соединений (active/reading/writing/waiting), accepted/handled/requests (rate), cache status (hit/miss/bypass/...), server requestMsec, HTTP responses by code class, upstream bytes/time/requests, shared zones (usedsize/maxsize), upstream response time distribution.
+3. **angie — детали метрик (12 панелей)** — все 26 метрик `angie_*`: active/idle connections, accepted/dropped (rate), server zone requests (total/processing/discarded), HTTP responses by code, upstream keepalive, peer state, upstream peers bytes/responses, health (fails/unavailable/downtime), selected (current/total), slabs pages (free/used), slabs slots (used/free/reqs/fails by size).
+
+Дашборд использует метрики, которые scrape'ит vmagent (см. `values/victoriametrics-values.yaml.tftpl`, секция `extraObjects` → `vmks-additional-scrape-configs`):
+
+- **nginx-vts-docker** (12 метрик `nginx_*`): `nginx_server_requests`, `nginx_server_bytes`, `nginx_server_connections`, `nginx_server_cache`, `nginx_server_requestMsec`, `nginx_server_sharedzones`, `nginx_upstream_bytes`, `nginx_upstream_requestMsec`, `nginx_upstream_requests`, `nginx_upstream_responseMsec`, `nginx_server_info`, `nginx_vts_exporter_build_info` — через `nginx-vts-exporter` на `:9913/metrics`.
+- **angie** (26 метрик `angie_*`): `angie_connections_*` (4), `angie_http_server_zones_*` (6), `angie_http_upstreams_keepalive`, `angie_http_upstreams_peers_*` (8), `angie_slabs_*` (7) — нативный Prometheus на `:80/metrics`.
+
+Datasource в Grafana — `VictoriaMetrics` (type `prometheus`, url `http://vmsingle-vm-stack.vmks.svc.cluster.local.:8428`), создаётся чартом автоматически. Откройте дашборд: Grafana → Dashboards → **Nginx-VTS vs Angie Benchmark** (папка `default`), либо напрямую по UID `nginx-vts-vs-angie-benchmark`:
+
+```bash
+echo "http://$(terraform output -raw grafana_url | sed 's|http://||')/d/nginx-vts-vs-angie-benchmark"
+```
+
+### Angie Console Light
+
+Web-консоль Angie (визуальный мониторинг в реальном времени: connections, server zones, upstreams, caches, SSL) доступна по адресу, который выводится в `terraform output`:
+
+```bash
+terraform output angie_console_url
+# http://angie-console.<angie_ip>.sslip.io/console/
+```
+
+Откройте URL в браузере (без аутентификации — `auth_basic` намеренно не включён, т.к. IP VM публичный только на время замера; для production добавьте `auth_basic`).
 
 > sslip.io — бесплатный wildcard-DNS: `<anything>.<IP>.sslip.io` всегда резолвится в `<IP>`. Не требует делегирования доменной зоны.
 
@@ -274,7 +306,7 @@ location /console/ {
 }
 ```
 
-Консоль доступна в браузере по `http://<angie_ip>/console/` (без аутентификации — в этом бенчмарке `auth_basic` намеренно не включён, т.к. IP VM публичный только на время замера; для production добавьте `auth_basic`). У nginx-vts аналога нет — только JSON `/status`.
+Консоль доступна в браузере по `http://angie-console.<angie_ip>.sslip.io/console/` (URL выводится в `terraform output angie_console_url`; домен формируется через sslip.io из публичного IP VM Angie, `server_name _;` в конфиге принимает любой Host). Без аутентификации — в этом бенчмарке `auth_basic` намеренно не включён, т.к. IP VM публичный только на время замера; для production добавьте `auth_basic`. У nginx-vts аналога нет — только JSON `/status`.
 
 ## Особенности доставки логов (vector → VictoriaLogs)
 
