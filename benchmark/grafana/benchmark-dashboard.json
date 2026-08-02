@@ -18,7 +18,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(nginx_server_requests{variant=\"nginx-vts-docker\",host=\"*\"}[1m]))",
+          "expr": "sum(rate(nginx_server_requests{variant=\"nginx-vts-docker\",host=\"*\",code=\"total\"}[1m]))",
           "legendFormat": "nginx-vts-docker",
           "refId": "N"
         },
@@ -319,7 +319,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (code) (rate(nginx_server_requests{variant=\"nginx-vts-docker\",host=\"*\"}[1m]))",
+          "expr": "sum by (code) (rate(nginx_server_requests{variant=\"nginx-vts-docker\",host=\"*\",code!=\"total\"}[1m]))",
           "legendFormat": "{{code}}/s",
           "refId": "{"
         }
