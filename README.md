@@ -233,13 +233,13 @@ terraform output grafana_admin_password_command    # команда для по�
 
 ### Готовый дашборд в Grafana
 
-Дашборд **«Nginx-VTS vs Angie Benchmark»** (31 панель + 2 row-разделителя) провизирован в Grafana **автоматически** при `terraform apply` — через ConfigMap `benchmark-dashboard` (namespace `vmks`, лейбл `grafana_dashboard: "1"`), который подхватывает sidecar `grafana-sc-dashboard` чарта `vmks`. Ручной импорт не требуется.
+Дашборд **«Nginx-VTS vs Angie Benchmark»** (27 панелей + 2 row-разделителя) провизирован в Grafana **автоматически** при `terraform apply` — через ConfigMap `benchmark-dashboard` (namespace `vmks`, лейбл `grafana_dashboard: "1"`), который подхватывает sidecar `grafana-sc-dashboard` чарта `vmks`. Ручной импорт не требуется.
 
 Дашборд разбит на три секции:
 
-1. **Сравнение (8 панелей)** — RPS по вариантам, активные соединения, входящий/исходящий трафик, HTTP 2xx responses, upstream response time, метрики vector. Парные запросы nginx-vts и angie на одной панели для сопоставления.
-2. **nginx-vts-docker — детали метрик (11 панелей)** — все 12 метрик `nginx_*`: состояния соединений (active/reading/writing/waiting), accepted/handled/requests (rate), cache status (hit/miss/bypass/...), server requestMsec, HTTP responses by code class, upstream bytes/time/requests, shared zones (usedsize/maxsize), upstream response time distribution.
-3. **angie — детали метрик (12 панелей)** — все 26 метрик `angie_*`: active/idle connections, accepted/dropped (rate), server zone requests (total/processing/discarded), HTTP responses by code, upstream keepalive, peer state, upstream peers bytes/responses, health (fails/unavailable/downtime), selected (current/total), slabs pages (free/used), slabs slots (used/free/reqs/fails by size).
+1. **Сравнение (6 панелей)** — RPS по вариантам, входящий/исходящий трафик, upstream request/response time, метрики vector. Парные запросы nginx-vts и angie на одной панели для сопоставления. (Active connections и HTTP 2xx вынесены в секции деталей — там представлены полным набором состояний/кодов.)
+2. **nginx-vts-docker — детали метрик (8 панелей)** — все 12 метрик `nginx_*`: состояния соединений (active/reading/writing/waiting), accepted/handled/requests (rate), cache status (hit/miss/bypass/...), server requestMsec, HTTP responses by code class, upstream bytes/requests by code, shared zones (usedsize/maxsize). (Upstream request/response time объединены в одну панель в секции «Сравнение».)
+3. **angie — детали метрик (13 панелей)** — все 26 метрик `angie_*`: active/idle connections, accepted/dropped (rate), server zone requests (total/processing/discarded), HTTP responses by code, upstream keepalive, peer state, upstream peers bytes/responses, health (fails/unavailable/downtime), selected (current/total), slabs pages (free/used), slabs slots (used/free/reqs/fails by size).
 
 Дашборд использует метрики, которые scrape'ит vmagent (см. `values/victoriametrics-values.yaml.tftpl`, секция `extraObjects` → `vmks-additional-scrape-configs`):
 

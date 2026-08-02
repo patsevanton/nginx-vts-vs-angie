@@ -34,39 +34,13 @@
       }
     },
     {
-      "title": "Active Connections",
+      "title": "Bytes Received (Ingress Traffic)",
       "type": "timeseries",
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 12,
         "y": 0
-      },
-      "targets": [
-        {
-          "expr": "sum(nginx_server_connections{variant=\"nginx-vts-docker\",status=\"active\"})",
-          "legendFormat": "nginx-vts-docker",
-          "refId": "N"
-        },
-        {
-          "expr": "sum(angie_connections_active{variant=\"angie\"})",
-          "legendFormat": "angie",
-          "refId": "A"
-        }
-      ],
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      }
-    },
-    {
-      "title": "Bytes Received (Ingress Traffic)",
-      "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 8
       },
       "targets": [
         {
@@ -96,7 +70,7 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 12,
+        "x": 0,
         "y": 8
       },
       "targets": [
@@ -122,45 +96,24 @@
       }
     },
     {
-      "title": "HTTP 2xx Responses (rate)",
-      "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 16
-      },
-      "targets": [
-        {
-          "expr": "sum(rate(nginx_server_requests{variant=\"nginx-vts-docker\",code=\"2xx\"}[1m]))",
-          "legendFormat": "nginx-vts-docker 2xx",
-          "refId": "N"
-        },
-        {
-          "expr": "sum(rate(angie_http_server_zones_responses{variant=\"angie\",code=~\"2..\"}[1m]))",
-          "legendFormat": "angie 2xx",
-          "refId": "A"
-        }
-      ],
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      }
-    },
-    {
-      "title": "Upstream Response Time (avg, ms)",
+      "title": "Upstream Request/Response Time (avg, ms)",
       "type": "timeseries",
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 16
+        "y": 8
       },
       "targets": [
         {
           "expr": "sum(rate(nginx_upstream_responseMsec{variant=\"nginx-vts-docker\"}[1m])) / sum(rate(nginx_upstream_requests{variant=\"nginx-vts-docker\"}[1m]))",
           "legendFormat": "nginx-vts-docker",
           "refId": "N"
+        },
+        {
+          "expr": "avg(nginx_upstream_requestMsec{variant=\"nginx-vts-docker\"})",
+          "legendFormat": "nginx-vts requestMsec",
+          "refId": "R"
         }
       ],
       "fieldConfig": {
@@ -171,7 +124,8 @@
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
-      }
+      },
+      "description": "nginx_upstream_requestMsec (время запроса к upstream) и nginx_upstream_responseMsec (время ответа от upstream) — avg. Распределение по backend'ам не показывается отдельно, т.к. backend один."
     },
     {
       "title": "Vector Processed Events",
@@ -180,7 +134,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 24
+        "y": 16
       },
       "targets": [
         {
@@ -201,7 +155,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 24
+        "y": 16
       },
       "targets": [
         {
@@ -227,7 +181,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 32
+        "y": 24
       },
       "collapsed": false,
       "panels": [],
@@ -243,7 +197,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 33
+        "y": 25
       },
       "targets": [
         {
@@ -280,7 +234,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 33
+        "y": 25
       },
       "targets": [
         {
@@ -312,7 +266,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 41
+        "y": 33
       },
       "targets": [
         {
@@ -334,7 +288,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 41
+        "y": 33
       },
       "targets": [
         {
@@ -361,7 +315,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 49
+        "y": 41
       },
       "targets": [
         {
@@ -383,7 +337,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 49
+        "y": 41
       },
       "targets": [
         {
@@ -403,40 +357,13 @@
       }
     },
     {
-      "title": "nginx-vts: Upstream Request Time (ms)",
-      "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 57
-      },
-      "targets": [
-        {
-          "expr": "avg(nginx_upstream_requestMsec{variant=\"nginx-vts-docker\"})",
-          "legendFormat": "nginx-vts-docker",
-          "refId": "N"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ms"
-        }
-      },
-      "description": "Среднее время запроса к upstream.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      }
-    },
-    {
       "title": "nginx-vts: Upstream responses by code (rate)",
       "type": "timeseries",
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 12,
-        "y": 57
+        "x": 0,
+        "y": 49
       },
       "targets": [
         {
@@ -456,8 +383,8 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 0,
-        "y": 65
+        "x": 12,
+        "y": 49
       },
       "targets": [
         {
@@ -473,39 +400,13 @@
       }
     },
     {
-      "title": "nginx-vts: Upstream Response Time distribution (ms)",
-      "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 65
-      },
-      "targets": [
-        {
-          "expr": "avg by (backend) (nginx_upstream_responseMsec{variant=\"nginx-vts-docker\"})",
-          "legendFormat": "{{backend}}",
-          "refId": "{"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ms"
-        }
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      }
-    },
-    {
       "title": "angie — детали метрик",
       "type": "row",
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 73
+        "y": 57
       },
       "collapsed": false,
       "panels": [],
@@ -521,7 +422,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 74
+        "y": 58
       },
       "targets": [
         {
@@ -548,7 +449,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 74
+        "y": 58
       },
       "targets": [
         {
@@ -575,7 +476,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 82
+        "y": 66
       },
       "targets": [
         {
@@ -607,7 +508,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 82
+        "y": 66
       },
       "targets": [
         {
@@ -628,7 +529,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 90
+        "y": 74
       },
       "targets": [
         {
@@ -650,7 +551,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 90
+        "y": 74
       },
       "targets": [
         {
@@ -672,7 +573,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 98
+        "y": 82
       },
       "targets": [
         {
@@ -703,7 +604,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 98
+        "y": 82
       },
       "targets": [
         {
@@ -724,7 +625,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 106
+        "y": 90
       },
       "targets": [
         {
@@ -756,7 +657,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 106
+        "y": 90
       },
       "targets": [
         {
@@ -783,7 +684,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 114
+        "y": 98
       },
       "targets": [
         {
@@ -810,7 +711,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 114
+        "y": 98
       },
       "targets": [
         {
@@ -837,7 +738,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 122
+        "y": 106
       },
       "targets": [
         {
@@ -865,5 +766,5 @@
   },
   "uid": "nginx-vts-vs-angie-benchmark",
   "schemaVersion": 39,
-  "version": 1
+  "version": 2
 }
