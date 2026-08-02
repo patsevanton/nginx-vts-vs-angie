@@ -18,7 +18,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(nginx_server_requests{variant=\"nginx-vts-docker\",host=~\".*\"}[1m]))",
+          "expr": "sum(rate(nginx_server_requests{variant=\"nginx-vts-docker\",host=\"*\"}[1m]))",
           "legendFormat": "nginx-vts-docker",
           "refId": "N"
         },
@@ -44,7 +44,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(nginx_server_bytes{variant=\"nginx-vts-docker\",direction=\"in\"}[1m]))",
+          "expr": "sum(rate(nginx_server_bytes{host=\"*\",variant=\"nginx-vts-docker\",direction=\"in\"}[1m]))",
           "legendFormat": "nginx-vts-docker bytes_in/s",
           "refId": "N"
         },
@@ -75,7 +75,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(nginx_server_bytes{variant=\"nginx-vts-docker\",direction=\"out\"}[1m]))",
+          "expr": "sum(rate(nginx_server_bytes{host=\"*\",variant=\"nginx-vts-docker\",direction=\"out\"}[1m]))",
           "legendFormat": "nginx-vts-docker bytes_out/s",
           "refId": "N"
         },
@@ -766,5 +766,5 @@
   },
   "uid": "nginx-vts-vs-angie-benchmark",
   "schemaVersion": 39,
-  "version": 2
+  "version": 3
 }
