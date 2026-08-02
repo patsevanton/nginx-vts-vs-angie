@@ -795,7 +795,8 @@
           "type": "prometheus",
           "uid": "VictoriaMetrics"
         },
-        "query": "label_values(nginx_server_requests{variant=~\"$variant\"}, host) or label_values(angie_http_server_zones_requests_total{variant=~\"$variant\",zone=~\"$vhost\"}, zone)",
+        "query": "query_result(label_replace(nginx_server_requests{variant=~\"$variant\"}, \"vhost\", \"$1\", \"host\", \"(.+)\") or label_replace(angie_http_server_zones_requests_total{variant=~\"$variant\"}, \"vhost\", \"$1\", \"zone\", \"(.+)\"))",
+        "regex": "/vhost=\"([^\"]+)\"/",
         "refresh": 1,
         "sort": 1,
         "multi": true,
