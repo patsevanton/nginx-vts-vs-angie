@@ -58,8 +58,9 @@ write_files:
               listen 80;
               server_name _;
 
-              # Имя зоны статистики = Host запроса -> лейбл zone=<host> в angie_http_server_zones_*
-              status_zone $host;
+              # Имя зоны статистики = Host запроса от k6 (benchmark.local) -> лейбл zone="benchmark.local"
+              # в angie_http_server_zones_*. Angie не раскрывает переменные в status_zone, поэтому имя задаётся статически.
+              status_zone benchmark.local;
 
               location / {
                   proxy_pass http://backend;
