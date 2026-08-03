@@ -17,6 +17,13 @@ const VARIANT = __ENV.VARIANT || 'nginx-vts-docker';
 const TARGET_HOST = TARGETS[VARIANT];
 const BASE_URL = `http://${TARGET_HOST}`;
 
+// Host-заголовок зависит от варианта -> у каждого прокси свой vhost в метриках
+// (nginx-vts: host="nginx-vts.benchmark.local", angie: zone="angie.benchmark.local")
+const VHOST = {
+  'nginx-vts-docker': 'nginx-vts.benchmark.local',
+  'angie': 'angie.benchmark.local',
+}[VARIANT];
+
 export const options = {
   scenarios: {
     warmup: {
@@ -50,7 +57,7 @@ export const options = {
 
 export default function () {
   const res = http.get(`${BASE_URL}/`, {
-    headers: { 'Host': 'benchmark.local' },
+    headers: { 'Host': VHOST },
   });
 
   check(res, {

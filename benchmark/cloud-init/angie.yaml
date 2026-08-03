@@ -54,21 +54,14 @@ write_files:
               keepalive 64;
           }
 
+          # Default server: скрейпы vmagent к /metrics, обращения к /api/, /console/, /status.html.
+          # Без status_zone — не искажает метрики зоны бенчмарка.
           server {
-              listen 80;
+              listen 80 default_server;
               server_name _;
 
-              # Имя зоны статистики = Host запроса от k6 (benchmark.local) -> лейбл zone="benchmark.local"
-              # в angie_http_server_zones_*. Angie не раскрывает переменные в status_zone, поэтому имя задаётся статически.
-              status_zone benchmark.local;
-
               location / {
-                  proxy_pass http://backend;
-                  proxy_http_version 1.1;
-                  proxy_set_header Connection "";
-                  proxy_set_header Host $host;
-                  proxy_set_header X-Real-IP $remote_addr;
-                  proxy_set_header X-Request-ID $request_id;
+                  return 404;
               }
 
               location /api/ {
@@ -91,6 +84,24 @@ write_files:
                   location /console/api/ {
                       api /status/;
                   }
+              }
+          }
+
+          # Benchmark server: трафик от k6 (Host: angie.benchmark.local).
+          # status_zone -> метрика angie_http_server_zones_*{zone="angie.benchmark.local"}.
+          server {
+              listen 80;
+              server_name angie.benchmark.local;
+
+              status_zone angie.benchmark.local;
+
+              location / {
+                  proxy_pass http://backend;
+                  proxy_http_version 1.1;
+                  proxy_set_header Connection "";
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Request-ID $request_id;
               }
           }
       }
