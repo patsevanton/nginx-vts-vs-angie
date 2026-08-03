@@ -18,7 +18,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(nginx_server_requests{variant=~\"$variant\",host=~\"$vhost\",code=\"total\"}[1m]))",
+          "expr": "sum(rate(nginx_server_requests{variant=~\"$variant\",host=~\"$vhost\",host!=\"*\",code=\"total\"}[1m]))",
           "legendFormat": "nginx-vts-docker",
           "refId": "N"
         },
@@ -44,7 +44,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(nginx_server_bytes{host=~\"$vhost\",variant=~\"$variant\",direction=\"in\"}[1m]))",
+          "expr": "sum(rate(nginx_server_bytes{host=~\"$vhost\",host!=\"*\",variant=~\"$variant\",direction=\"in\"}[1m]))",
           "legendFormat": "nginx-vts-docker bytes_in/s",
           "refId": "N"
         },
@@ -75,7 +75,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(nginx_server_bytes{host=~\"$vhost\",variant=~\"$variant\",direction=\"out\"}[1m]))",
+          "expr": "sum(rate(nginx_server_bytes{host=~\"$vhost\",host!=\"*\",variant=~\"$variant\",direction=\"out\"}[1m]))",
           "legendFormat": "nginx-vts-docker bytes_out/s",
           "refId": "N"
         },
@@ -270,12 +270,12 @@
       },
       "targets": [
         {
-          "expr": "sum by (status) (rate(nginx_server_cache{variant=~\"$variant\",host=~\"$vhost\"}[1m]))",
+          "expr": "sum by (status) (rate(nginx_server_cache{variant=~\"$variant\",host=~\"$vhost\",host!=\"*\"}[1m]))",
           "legendFormat": "{{status}}/s",
           "refId": "{"
         }
       ],
-      "description": "hit/miss/bypass/expired/revalidated/scarce/stale/updating. host=* (агрегат VTS).",
+      "description": "hit/miss/bypass/expired/revalidated/scarce/stale/updating. Агрегат host=* исключён (дублирует сумму по реальным vhost).",
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
@@ -292,7 +292,7 @@
       },
       "targets": [
         {
-          "expr": "avg(nginx_server_requestMsec{variant=~\"$variant\",host=~\"$vhost\"})",
+          "expr": "avg(nginx_server_requestMsec{variant=~\"$variant\",host=~\"$vhost\",host!=\"*\"})",
           "legendFormat": "nginx-vts-docker",
           "refId": "N"
         }
@@ -319,12 +319,12 @@
       },
       "targets": [
         {
-          "expr": "sum by (code) (rate(nginx_server_requests{variant=~\"$variant\",host=~\"$vhost\",code!=\"total\"}[1m]))",
+          "expr": "sum by (code) (rate(nginx_server_requests{variant=~\"$variant\",host=~\"$vhost\",host!=\"*\",code!=\"total\"}[1m]))",
           "legendFormat": "{{code}}/s",
           "refId": "{"
         }
       ],
-      "description": "1xx/2xx/3xx/4xx/5xx/total. host=* (агрегат VTS).",
+      "description": "1xx/2xx/3xx/4xx/5xx/total. Агрегат host=* исключён (дублирует сумму по реальным vhost).",
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
