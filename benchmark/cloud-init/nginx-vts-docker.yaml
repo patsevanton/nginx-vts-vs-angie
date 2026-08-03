@@ -35,8 +35,6 @@ write_files:
           vhost_traffic_status_zone;
           # filter_by_host on — VTS автоматически разлагает метрики по Host запроса.
           # k6 шлёт Host: nginx-vts.benchmark.local -> метрика nginx_server_requests{host="nginx-vts.benchmark.local"}.
-          # Явно server_name не прописываем (в отличие от Angie): один server_name _ ловит все Host'ы,
-          # а VTS разлагает по host-лейблу без дополнительных server-блоков.
           vhost_traffic_status_filter_by_host on;
 
           upstream backend {
@@ -44,18 +42,12 @@ write_files:
               keepalive 64;
           }
 
+          # Default server: скрейпы nginx-vts-exporter к /status, обращения к /stub_status.
+          # server_name _ ловит все Host'ы, кроме явно заданного nginx-vts.benchmark.local (см. ниже).
+          # Без location / — чтобы скрейпы с Host=IP не попадали в backend и не искажали метрики.
           server {
-              listen 80;
+              listen 80 default_server;
               server_name _;
-
-              location / {
-                  proxy_pass http://backend;
-                  proxy_http_version 1.1;
-                  proxy_set_header Connection "";
-                  proxy_set_header Host $host;
-                  proxy_set_header X-Real-IP $remote_addr;
-                  proxy_set_header X-Request-ID $request_id;
-              }
 
               location /status {
                   vhost_traffic_status_display;
@@ -64,6 +56,22 @@ write_files:
 
               location /stub_status {
                   stub_status;
+              }
+          }
+
+          # Benchmark server: трафик от k6 (Host: nginx-vts.benchmark.local).
+          # VTS разлагает метрики по host-лейблу -> nginx_server_requests{host="nginx-vts.benchmark.local"}.
+          server {
+              listen 80;
+              server_name nginx-vts.benchmark.local;
+
+              location / {
+                  proxy_pass http://backend;
+                  proxy_http_version 1.1;
+                  proxy_set_header Connection "";
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Request-ID $request_id;
               }
           }
       }
