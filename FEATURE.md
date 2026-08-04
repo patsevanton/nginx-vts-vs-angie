@@ -46,47 +46,9 @@
 - Многоуровневые балансировщики (например, HAProxy → Angie): корректная передача клиентского IP и метаданных.
 - Cloud-окружения, где LB снимает TLS и передаёт данные приложению через PROXY Protocol.
 
-### 4. Авторизация и балансировка для MQTT
-
-**Что это.** Модуль [stream_mqtt_preread](https://en.angie.software/angie/docs/configuration/modules/stream/stream_mqtt_preread/) разбирает пакеты MQTT и позволяет балансировать и авторизовать клиентов по данным протокола (client ID, username и т. п.).
-
-**Чем полезно.**
-- MQTT-брокеры (Mosquitto, EMQX, HiveMQ) часто кластеризуются; Angie может маршрутизировать клиентов по их ID для sticky-сессий.
-- Авторизация на уровне балансировщика снимает нагрузку с брокеров и позволяет централизованно управлять доступом.
-
-**Где применимо.**
-- IoT-инфраструктуры с тысячами устройств, подключаемых по MQTT.
-- Окружения, требующие sticky-сессий по client ID (чтобы один клиент всегда попадал на одного брокера).
-
-### 5. Балансировка RDP по сессионным cookie
-
-**Что это.** Модуль [stream_rdp_preread](https://en.angie.software/angie/docs/configuration/modules/stream/stream_rdp_preread/) извлекает сессионные cookie протокола RDP и учитывает их при балансировке.
-
-**Чем полезно.**
-- RDP-сессии чувствительны к серверу: переключение пользователя между серверами в течение сессии недопустимо.
-- Cookie-based affinity обеспечивает, что переподключение того же пользователя попадёт на ту же машину.
-
-**Где применимо.**
-- Терминальные фермы (RDSH), VDI-инфраструктуры, удалённые рабочие места.
-- Публичные/корпоративные шлюзы к RDP-кластерам.
-
-### 6. XOAUTH2 и OAUTHBEARER в почтовом прокси
-
-**Что это.** Поддержка современных SASL-механизмов [XOAUTH2 и OAUTHBEARER](https://en.angie.software/angie/docs/configuration/modules/mail/mail_smtp/#m-smtp-auth) в почтовом прокси.
-
-**Чем полезно.**
-- Позволяет клиентам аутентифицироваться по OAuth2-токенам (например, от Azure AD, Google) вместо паролей.
-- Устраняет необходимость хранить/передавать пароли; упрощает соответствие политикам безопасности (MFA, условный доступ).
-
-**Где применимо.**
-- Корпоративные SMTP/IMAP-прокси, интегрированные с IdP (Microsoft Entra, Google Workspace).
-- Окружения, где парольная аутентификация запрещена политикой.
-
----
-
 ## TLS и управление сертификатами
 
-### 7. Automatic HTTPS (встроенный ACME)
+### 4. Automatic HTTPS (встроенный ACME)
 
 **Что это.** Встроенный [ACME-клиент](https://en.angie.software/angie/docs/configuration/acme/) для автоматического выпуска мультидоменных, wildcard и IP-сертификатов с поддержкой HTTP-, DNS- и ALPN-челленджей, ACME-профилей и External Account Binding (EAB) для коммерческих CA.
 
@@ -101,7 +63,7 @@
 - Инфраструктуры с wildcard-сертификатами (`*.example.com`).
 - Внутренние сервисы за firewall, где доступен только DNS-челлендж.
 
-### 8. TLS 1.3 Early Data (0-RTT)
+### 5. TLS 1.3 Early Data (0-RTT)
 
 **Что это.** Поддержка 0-RTT для HTTP и [stream](https://en.angie.software/angie/docs/configuration/modules/stream/stream_ssl/#ssl-early-data) (в nginx — только HTTP).
 
@@ -115,23 +77,9 @@
 
 > **Важно:** 0-RTT подвержен replay-атакам; применять только для идемпотентных запросов или с дополнительной защитой.
 
-### 9. NTLS (Tongsuo)
-
-**Что это.** Поддержка национального TLS (NTLS) на [серверной](https://en.angie.software/angie/docs/configuration/modules/http/http_ssl/#ssl-ntls) и [клиентской](https://en.angie.software/angie/docs/configuration/modules/http/http_proxy/#proxy-ssl-ntls) стороне через библиотеку [Tongsuo](https://github.com/Tongsuo-Project/Tongsuo).
-
-**Чем полезно.**
-- NTLS реализует китайские криптоалгоритмы (SM2/SM3/SM4), требуемые регуляторами КНР для ряда отраслей.
-- Поддержка как сервера, так и прокси к upstream позволяет строить end-to-end NTLS-цепочки.
-
-**Где применимо.**
-- Китайский рынок: финтех, госсектор, медицина, где обязательна китайская криптография.
-- Совместимость с клиентами/бэкендами, требующими SM-алгоритмы.
-
----
-
 ## Балансировка и upstream
 
-### 10. Динамическое обновление upstream по Docker
+### 6. Динамическое обновление upstream по Docker
 
 **Что это.** Модуль [http_docker](https://en.angie.software/angie/docs/configuration/modules/http/http_docker/#http-docker) обновляет группы upstream на основе событий и меток Docker-контейнеров (или Podman) без reload.
 
@@ -145,7 +93,7 @@
 - Автоскейлинг (ECS, Docker Swarm, Nomad, Kubernetes-side).
 - Разработка и staging, где контейнеры поднимаются ad-hoc.
 
-### 11. Балансировка по среднему времени ответа
+### 7. Балансировка по среднему времени ответа
 
 **Что это.** Алгоритм [least-time](https://en.angie.software/angie/docs/configuration/modules/http/http_upstream/#least-time) с вероятностным выбором: более быстрые серверы получают пропорционально больше трафика, всплески сглаживаются настраиваемым коэффициентом, ни один сервер не остаётся без трафика.
 
@@ -159,7 +107,7 @@
 - API с переменной нагрузкой, где время ответа сильно колеблется.
 - Окружения, где ручная настройка весов дорогостоящая или невозможна.
 
-### 12. Привязка сессий (sticky) для HTTP и stream
+### 8. Привязка сессий (sticky) для HTTP и stream
 
 **Что это.** [Sticky-сессии](https://en.angie.software/angie/docs/configuration/modules/http/http_upstream/#u-sticky) для HTTP и stream (в nginx — только HTTP), с режимом `learn` (автоопределение сессий из ответов) и `drain` (плавный вывод сервера).
 
@@ -173,7 +121,7 @@
 - Плавный вывод узлов при деплое (zero-downtime без потери сессий).
 - TCP-прокси с требованиями affinity.
 
-### 13. slow_start для HTTP и stream
+### 9. slow_start для HTTP и stream
 
 **Что это.** Опция `slow_start` директивы [server](https://en.angie.software/angie/docs/configuration/modules/http/http_upstream/#u-server) для HTTP и stream upstream (в nginx — только HTTP).
 
@@ -190,7 +138,7 @@
 
 ## Наблюдаемость и мониторинг
 
-### 14. RESTful API в JSON
+### 10. RESTful API в JSON
 
 **Что это.** [API-интерфейс](https://en.angie.software/angie/docs/configuration/modules/http/http_api/#a-api) раскрывает: базовую информацию о сервере, [конфигурации](https://en.angie.software/angie/docs/configuration/modules/http/http_api/#a-api-config-files), [метрики](https://en.angie.software/angie/docs/configuration/modules/http/http_api/#metrics) проксируемых серверов, клиентских соединений, shared memory zones, TLS-сертификатов и др.
 
@@ -204,7 +152,7 @@
 - Автоматизация运维-задач (перевыпуск сертификатов, аудит конфигов).
 - Интеграция с системами APM (Datadog, Zabbix, Prometheus).
 
-### 15. Экспорт в Prometheus
+### 11. Экспорт в Prometheus
 
 **Что это.** Модуль [http_prometheus](https://en.angie.software/angie/docs/configuration/modules/http/http_prometheus/#prometheus) с [настраиваемыми шаблонами](https://en.angie.software/angie/docs/configuration/modules/http/http_prometheus/#prometheus-template).
 
@@ -216,7 +164,7 @@
 - Любые окружения с Prometheus/VictoriaMetrics/Grafana.
 - Мульти-тенантные кластеры с разной структурой метрик.
 
-### 16. Console Light — визуальный мониторинг в браузере
+### 12. Console Light — визуальный мониторинг в браузере
 
 **Что это.** Встроенный [визуальный инструмент](https://en.angie.software/angie/docs/configuration/monitoring/) для наблюдения за сервером через браузер. Демо: <https://console.angie.software/>
 
@@ -228,7 +176,7 @@
 - Малые и средние команды без полноценной observability-инфраструктуры.
 - Дежурные режимы: быстро посмотреть состояние без поднятия Grafana.
 
-### 17. Модуль Metric — настраиваемая статистика в реальном времени
+### 13. Модуль Metric — настраиваемая статистика в реальном времени
 
 **Что это.** Модуль [http_metric](https://en.angie.software/angie/docs/configuration/modules/http/http_metric/) для сбора статистики HTTP и stream в реальном времени: счётчики, гистограммы, скользящие средние, сгруппированные по пользовательским ключам. Доступ через `/status/http/metric_zones/` и `/status/stream/metric_zones/` с поддержкой Prometheus.
 
@@ -242,7 +190,7 @@
 - Мульти-тенантные платформы с разбивкой метрик по клиентам.
 - A/B-тесты с замерами производительности по сегментам.
 
-### 18. Расширенное логирование ошибок
+### 14. Расширенное логирование ошибок
 
 **Что это.** Улучшенный [error_log](https://en.angie.software/angie/docs/configuration/modules/core/#error-log): фильтрация через `filter=`, директива `error_log_user_tag`, JSON-вывод через `format=`, ограничение частоты через `rate=`.
 
@@ -257,11 +205,10 @@
 - Production под высокой нагрузкой с риском лог-штормов.
 - Соответствие требованиям по форматам логов (JSON в SIEM).
 
----
 
 ## Удобство конфигурации и эксплуатации
 
-### 19. Объединение location
+### 15. Объединение location
 
 **Что это.** Несколько выражений сопоставления в одной директиве `location`: [объединение](https://en.angie.software/angie/docs/configuration/modules/http/#combined-locations) блоков с общими настройками.
 
@@ -273,7 +220,7 @@
 - API с набором endpoint'ов с одинаковым поведением (`/api/v1/*`, `/api/v2/*`).
 - Legacy-конфиги с повторяющимися блоками.
 
-### 20. Директива goto
+### 16. Директива goto
 
 **Что это.** `goto` в модуле rewrite выполняет [внутренний редирект в named location](https://en.angie.software/angie/docs/configuration/modules/http/http_rewrite/#goto) без изменения URI.
 
@@ -285,7 +232,7 @@
 - Сценарии с условной маршрутизацией (авторизация → named location fallback).
 - Рефакторинг сложных конфигов с обходными путями.
 
-### 21. Автоматическая настройка DNS-резолвера
+### 17. Автоматическая настройка DNS-резолвера
 
 **Что это.** [Автоматическое чтение](https://en.angie.software/angie/docs/configuration/modules/http/#resolver) `/etc/resolv.conf`, файл перечитывается при изменениях.
 
@@ -298,7 +245,7 @@
 - Облака с динамическим DNS.
 - Окружения с приватными DNS-зонами (Route53, CoreDNS).
 
-### 22. Директива time_format
+### 18. Директива time_format
 
 **Что это.** [time_format](https://en.angie.software/angie/docs/configuration/modules/http/#time-format) определяет переменную с пользовательским форматом времени, спецификаторы в стиле `strftime()` и `%L` для миллисекунд.
 
@@ -310,11 +257,9 @@
 - Совместимость с парсерами логов, требующими ISO 8601 или кастомных форматов.
 - Кастомные заголовки с временной меткой (например, для трассировки).
 
----
-
 ## Контент и медиа
 
-### 23. Сброс зоны shared memory для proxy_cache_path на диск
+### 19. Сброс зоны shared memory для proxy_cache_path на диск
 
 **Что это.** Сброс зоны shared memory в [proxy_cache_path](https://en.angie.software/angie/docs/configuration/modules/http/http_proxy/#proxy-cache-path) на диск сохраняет индекс кэша между перезапусками.
 
@@ -327,7 +272,7 @@
 - Окружения с частыми деплоями/перезапусками.
 - Кэши большого объёма (сотни ГБ), где прогрев занимает минуты.
 
-### 24. Ограничение скорости MP4-передачи по битрейту
+### 20. Ограничение скорости MP4-передачи по битрейту
 
 **Что это.** Директива [mp4_limit_rate](https://en.angie.software/angie/docs/configuration/modules/http/http_mp4/#mp4-limit-rate) ограничивает скорость пропорционально битрейту файла.
 
@@ -340,7 +285,7 @@
 - Стриминговые сервисы, видеоплатформы.
 - Мобильные сети с дорогим трафиком.
 
-### 25. Обработка HEIC, AVIF и конвертация изображений
+### 21. Обработка HEIC, AVIF и конвертация изображений
 
 **Что это.** Модуль [http_image_filter](https://en.angie.software/angie/docs/configuration/modules/http/http_image_filter/#image-filter) поддерживает форматы HEIC (Apple) и AVIF (современный формат с лучшим сжатием), а также конвертацию между форматами.
 
@@ -354,22 +299,9 @@
 - Мобильные приложения с оптимизацией трафика.
 - Сайты с поддержкой Web Performance Best Practices.
 
----
-
 ## Инфраструктура
 
-### 26. Плавные сопровождающие релизы
-
-**Что это.** [Регулярные релизы](https://en.angie.software/angie/docs/oss_changes/) с оперативными багфиксами и крупными обновлениями, включающими уникальные фичи и лучшее из nginx и freenginx.
-
-**Чем полезно.**
-- Предсказуемый цикл обновлений, в отличие от freenginx/спорадических релизов nginx.
-- Багфиксы приходят быстро — важно для security.
-
-**Где применимо.**
-- Production-окружения, требующие актуальных версий и патчей.
-
-### 27. Готовые бинарные пакеты сторонних модулей
+### 22. Готовые бинарные пакеты сторонних модулей
 
 **Что это.** [Бинарные пакеты](https://en.angie.software/angie/docs/installation/oss_packages/#install-thirdpartymodules-oss) для многих популярных сторонних модулей.
 
@@ -381,27 +313,3 @@
 - Окружения, где сборка из исходников нежелательна (enterprise, regulated).
 - Команды без expertise в сборке nginx-модулей.
 
-### 28. Мультиязычная документация с поддержкой AI-ассистентов
-
-**Что это.** [Документация](https://en.angie.software/angie/docs/) на нескольких языках с [полнотекстовым поиском](https://en.angie.software/search/), [поддержкой AI](https://en.angie.software/angie/docs/configuration/#documentation-for-ai-assistants) через sitemap, Markdown-версии страниц и [Context7](https://context7.com/websites/en_angie_software_angie).
-
-**Чем полезно.**
-- ИИ-ассистенты (включая LLM в IDE) могут получать актуальную документацию Angie, а не галлюцинировать по nginx.
-- Markdown-версии страниц удобны для встраивания в инструменты и пайплайны.
-
-**Где применимо.**
-- Разработка с использованием AI-инструментов (Copilot, Cursor, opencode).
-- Команды, говорящие на разных языках (RU, EN, CN, ES, PT).
-
-### 29. Расширенный набор тестов
-
-**Что это.** Комплексный набор тестов в дереве исходников, значительно расширенный по сравнению с оригинальными тестами nginx, с покрытием кода более 80%, запускается через `make test`.
-
-**Чем полезно.**
-- Гарантия качества при релизах.
-- Сторонние разработчики модулей могут запускать тесты против Angie для проверки совместимости.
-- Снижает регрессионные риски при обновлениях.
-
-**Где применимо.**
-- CI/CD разработчиков модулей и самого Angie.
-- Окружения, требующие формальной валидации (enterprise, regulated).
