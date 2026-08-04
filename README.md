@@ -241,13 +241,12 @@ terraform output grafana_admin_password_command    # команда для по�
 
 ### Готовый дашборд в Grafana
 
-Дашборд **«Nginx-VTS vs Angie Benchmark»** (27 панелей + 2 row-разделителя) применяется в Grafana через ConfigMap `benchmark-dashboard` (namespace `vmks`, лейбл `grafana_dashboard: "1"`, файл `benchmark/manifests/benchmark-dashboard-configmap.yaml`), который подхватывает sidecar `grafana-sc-dashboard` чарта `vmks`. Файл манифеста генерируется Terraform из шаблона `benchmark/templates/benchmark-dashboard-configmap.yaml.tftpl`; команда применения выводится в `terraform output kubectl_apply_dashboard_command` и продублирована на шаге 3. Ручной импорт через JSON не требуется.
+Дашборд **«Nginx-VTS vs Angie Benchmark»** (34 панели + 1 row-разделитель) применяется в Grafana через ConfigMap `benchmark-dashboard` (namespace `vmks`, лейбл `grafana_dashboard: "1"`, файл `benchmark/manifests/benchmark-dashboard-configmap.yaml`), который подхватывает sidecar `grafana-sc-dashboard` чарта `vmks`. Файл манифеста генерируется Terraform из шаблона `benchmark/templates/benchmark-dashboard-configmap.yaml.tftpl`; команда применения выводится в `terraform output kubectl_apply_dashboard_command` и продублирована на шаге 3. Ручной импорт через JSON не требуется.
 
-Дашборд разбит на три секции:
+Дашборд разбит на две секции:
 
-1. **Сравнение (6 панелей)** — RPS по вариантам, входящий/исходящий трафик, upstream request/response time, метрики vector. Парные запросы nginx-vts и angie на одной панели для сопоставления. (Active connections и HTTP 2xx вынесены в секции деталей — там представлены полным набором состояний/кодов.)
-2. **nginx-vts-docker — детали метрик (8 панелей)** — все 12 метрик `nginx_*`: состояния соединений (active/reading/writing/waiting), accepted/handled/requests (rate), cache status (hit/miss/bypass/...), server requestMsec, HTTP responses by code class, upstream bytes/requests by code, shared zones (usedsize/maxsize). (Upstream request/response time объединены в одну панель в секции «Сравнение».)
-3. **angie — детали метрик (13 панелей)** — все 26 метрик `angie_*`: active/idle connections, accepted/dropped (rate), server zone requests (total/processing/discarded), HTTP responses by code, upstream keepalive, peer state, upstream peers bytes/responses, health (fails/unavailable/downtime), selected (current/total), slabs pages (free/used), slabs slots (used/free/reqs/fails by size).
+1. **Сравнение (4 сводные панели)** — RPS по вариантам, входящий/исходящий трафик, метрики vector. Парные запросы nginx-vts и angie на одной панели для сопоставления.
+2. **Парные метрики nginx-vts (слева) vs angie (справа) (1 row + 30 парных панелей = 15 пар)** — один общий row, в котором похожие метрики размещены рядом: nginx-vts всегда в левой колонке (`x: 0`), angie — в правой (`x: 12`), пары идут друг за другом по вертикали по темам: Connection states → Accepted/Handled → Server zone requests → HTTP responses by code → Server requestMsec → Cache status → Upstream responses by code → Upstream bytes → Upstream time/peer state → Shared zones/keepalive → Upstream health/selected → Slabs. Метрики без аналога (cache, upstream requestMsec — у nginx-vts; upstream keepalive/peer state/health/selected, slabs — у angie) помещены в тот же тематический row на свободной позиции с заголовком «(нет аналога …)» и пустым списком targets — для визуального параллелизма.
 
 Дашборд использует метрики, которые scrape'ит vmagent (см. `values/victoriametrics-values.yaml.tftpl`, секция `extraObjects` → `vmks-additional-scrape-configs`):
 
@@ -345,6 +344,74 @@ cloud-init VM `nginx-vts-docker` собирает образ `nginx:1.31.3-trixi
 6. **High peak ramp**: 100 → 200 VU за 30 сек
 7. **High peak sustained**: 200 VU × 60 сек
 8. **Cooldown**: 200 → 0 VU за 30 сек
+
+## Соответствие метрик nginx-vts и angie
+
+Таблица маппинга похожих метрик nginx-vts-docker (`nginx_*`, 12 метрик через `nginx-vts-exporter` на `:9913/metrics`) и angie (`angie_*`, 26 метрик через нативный Prometheus на `:80/metrics`). Метрики сгруппированы по темам; в каждой строке слева — метрика nginx-vts, справа — похожая метрика angie. Строки, где аналог отсутствует, помечены «—» в соответствующей колонке. Эта таблица — источник парных панелей в дашборде Grafana (см. «Готовый дашборд в Grafana»).
+
+### Connections
+
+| Тема | nginx-vts (метрика, лейблы) | angie (метрика, лейблы) | Тип | Примечание |
+|---|---|---|---|---|
+| Active connections | `nginx_server_connections{status="active"}` | `angie_connections_active` | gauge | текущие активные соединения |
+| Reading | `nginx_server_connections{status="reading"}` | — | gauge | Angie не разделяет неактивные соединения по состояниям |
+| Writing | `nginx_server_connections{status="writing"}` | — | gauge | то же |
+| Waiting | `nginx_server_connections{status="waiting"}` | — | gauge | то же |
+| Idle connections | — | `angie_connections_idle` | gauge | суммарные простаивающие; у nginx-vts аналога нет (раскладывается на reading/writing/waiting) |
+| Accepted connections | `nginx_server_connections{status="accepted"}` (rate) | `angie_connections_accepted` (rate) | counter | принято соединений |
+| Handled connections | `nginx_server_connections{status="handled"}` (rate) | — | counter | Angie не экспортирует handled отдельно (handled = accepted при drop=0) |
+| Dropped connections | — | `angie_connections_dropped` (rate) | counter | сброшенные соединения; nginx-vts не экспортирует dropped (можно вычислить как accepted − handled) |
+| Total requests (connection-level) | `nginx_server_connections{status="requests"}` (rate) | — | counter | суммарные запросы на уровне соединений; у angie учитывается в server_zones (`angie_http_server_zones_requests_total`) |
+
+### Server zone / HTTP
+
+| Тема | nginx-vts (метрика, лейблы) | angie (метрика, лейблы) | Тип | Примечание |
+|---|---|---|---|---|
+| Server zone requests total | `nginx_server_requests{code="total"}` (rate) | `angie_http_server_zones_requests_total` (rate) | counter | суммарные запросы в server zone |
+| Requests processing | — | `angie_http_server_zones_requests_processing` | gauge | запросы в обработке; nginx-vts аналога не имеет |
+| Requests discarded | — | `angie_http_server_zones_requests_discarded` (rate) | counter | отброшенные запросы; nginx-vts аналога не имеет |
+| HTTP responses by code | `nginx_server_requests{code!~"total"}` (rate by `code`) | `angie_http_server_zones_responses` (rate by `code`) | counter | 1xx/2xx/3xx/4xx/5xx |
+| Bytes received (in) | `nginx_server_bytes{direction="in"}` (rate) | `angie_http_server_zones_data_received` (rate) | counter | входящий трафик server zone |
+| Bytes sent (out) | `nginx_server_bytes{direction="out"}` (rate) | `angie_http_server_zones_data_sent` (rate) | counter | исходящий трафик server zone |
+| Server request processing time | `nginx_server_requestMsec` (avg) | — | gauge (avg) | среднее время обработки запроса, мс; angie не экспортирует per-request processing time в server zone |
+| Cache status | `nginx_server_cache` (rate by `status`) | — | counter | hit/miss/bypass/expired/revalidated/scarce/stale/updating; в бенчмарке angie не настроен с кэшем |
+
+### Upstream
+
+| Тема | nginx-vts (метрика, лейблы) | angie (метрика, лейблы) | Тип | Примечание |
+|---|---|---|---|---|
+| Upstream responses by code | `nginx_upstream_requests` (rate by `code`) | `angie_http_upstreams_peers_responses` (rate by `code`) | counter | ответы upstream по кодам |
+| Upstream bytes in | `nginx_upstream_bytes{direction="in"}` (rate) | `angie_http_upstreams_peers_data_received` (rate) | counter | байты от upstream (in) |
+| Upstream bytes out | `nginx_upstream_bytes{direction="out"}` (rate) | `angie_http_upstreams_peers_data_sent` (rate) | counter | байты к upstream (out) |
+| Upstream request time | `nginx_upstream_requestMsec` (avg) | — | gauge (avg) | время запроса к upstream, мс; angie аналога не имеет |
+| Upstream response time | `nginx_upstream_responseMsec` (avg) | — | gauge (avg) | время ответа от upstream, мс; angie аналога не имеет |
+| Upstream keepalive | — | `angie_http_upstreams_keepalive` | gauge | текущие keepalive-соединения к upstream; nginx-vts не экспортирует |
+| Upstream peer state | — | `angie_http_upstreams_peers_state` (by `peer`) | gauge | состояние peer'а (0=up); nginx-vts не экспортирует |
+| Upstream peer health: fails | — | `angie_http_upstreams_peers_health_fails` (rate) | counter | неудачи peer'а; nginx-vts не экспортирует |
+| Upstream peer health: unavailable | — | `angie_http_upstreams_peers_health_unavailable` (rate) | counter | недоступность peer'а; nginx-vts не экспортирует |
+| Upstream peer health: downtime | — | `angie_http_upstreams_peers_health_downtime` | gauge | суммарное время простоя peer'а, с; nginx-vts не экспортирует |
+| Upstream peer selected: current | — | `angie_http_upstreams_peers_selected_current` | gauge | текущие выбранные peer'ы; nginx-vts не экспортирует |
+| Upstream peer selected: total | — | `angie_http_upstreams_peers_selected_total` (rate) | counter | всего выбраний peer'а; nginx-vts не экспортирует |
+
+### Shared memory / Slabs
+
+| Тема | nginx-vts (метрика, лейблы) | angie (метрика, лейблы) | Тип | Примечание |
+|---|---|---|---|---|
+| Shared zone usedsize | `nginx_server_sharedzones{memstat="usedsize"}` | — | gauge | занято в зоне `ngx_http_vhost_traffic_status`; angie не экспортирует usedsize для этой зоны |
+| Shared zone maxsize | `nginx_server_sharedzones{memstat="maxsize"}` | — | gauge | лимит зоны `ngx_http_vhost_traffic_status`; angie не экспортирует maxsize для этой зоны |
+| Slabs pages free | — | `angie_slabs_pages_free` | gauge | свободные страницы slab-зоны `upstream_backend`; nginx-vts не экспортирует slabs |
+| Slabs pages used | — | `angie_slabs_pages_used` | gauge | занятые страницы slab-зоны; nginx-vts не экспортирует |
+| Slabs slots used | — | `angie_slabs_pages_slots_used` (by `size`) | gauge | занятые слоты по размеру; nginx-vts не экспортирует |
+| Slabs slots free | — | `angie_slabs_pages_slots_free` (by `size`) | gauge | свободные слоты по размеру; nginx-vts не экспортирует |
+| Slabs slots reqs | — | `angie_slabs_pages_slots_reqs` (rate by `size`) | counter | запросы выделения слотов; nginx-vts не экспортирует |
+| Slabs slots fails | — | `angie_slabs_pages_slots_fails` (rate by `size`) | counter | неудачи выделения слотов; nginx-vts не экспортирует |
+
+### Прочие метрики без пары
+
+| Метрика | Источник | Тип | Примечание |
+|---|---|---|---|
+| `nginx_server_info` | nginx-vts | info | метаданные сервера (`Info`-тип, значение 1) |
+| `nginx_vts_exporter_build_info` | nginx-vts-exporter | info | версия экспортёра (`Info`-тип, значение 1) |
 
 ## Очистка
 

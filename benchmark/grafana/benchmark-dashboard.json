@@ -1,769 +1,370 @@
 {
   "title": "Nginx-VTS vs Angie Benchmark",
-  "tags": [
-    "benchmark",
-    "nginx",
-    "angie"
-  ],
+  "tags": ["benchmark", "nginx", "angie"],
   "timezone": "browser",
   "panels": [
     {
-      "title": "RPS by Variant",
+      "title": "Сравнение: RPS by Variant",
       "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 0
-      },
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
       "targets": [
-        {
-          "expr": "sum(rate(nginx_server_requests{variant=~\"$variant\",host=~\"$vhost\",host!=\"*\",code=\"total\"}[1m]))",
-          "legendFormat": "nginx-vts-docker",
-          "refId": "N"
-        },
-        {
-          "expr": "sum(rate(angie_http_server_zones_requests_total{variant=~\"$variant\",zone=~\"$vhost\"}[1m]))",
-          "legendFormat": "angie",
-          "refId": "A"
-        }
+        {"expr": "sum(rate(nginx_server_requests{variant=~\"$variant\",host=~\"$vhost\",host!=\"*\",code=\"total\"}[1m]))", "legendFormat": "nginx-vts-docker", "refId": "N"},
+        {"expr": "sum(rate(angie_http_server_zones_requests_total{variant=~\"$variant\",zone=~\"$vhost\"}[1m]))", "legendFormat": "angie", "refId": "A"}
       ],
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      }
+      "datasource": {"type": "prometheus", "uid": "VictoriaMetrics"}
     },
     {
-      "title": "Bytes Received (Ingress Traffic)",
+      "title": "Сравнение: Bytes Received (Ingress Traffic)",
       "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 0
-      },
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
       "targets": [
-        {
-          "expr": "sum(rate(nginx_server_bytes{host=~\"$vhost\",host!=\"*\",variant=~\"$variant\",direction=\"in\"}[1m]))",
-          "legendFormat": "nginx-vts-docker bytes_in/s",
-          "refId": "N"
-        },
-        {
-          "expr": "sum(rate(angie_http_server_zones_data_received{variant=~\"$variant\",zone=~\"$vhost\"}[1m]))",
-          "legendFormat": "angie bytes_in/s",
-          "refId": "A"
-        }
+        {"expr": "sum(rate(nginx_server_bytes{host=~\"$vhost\",host!=\"*\",variant=~\"$variant\",direction=\"in\"}[1m]))", "legendFormat": "nginx-vts-docker bytes_in/s", "refId": "N"},
+        {"expr": "sum(rate(angie_http_server_zones_data_received{variant=~\"$variant\",zone=~\"$vhost\"}[1m]))", "legendFormat": "angie bytes_in/s", "refId": "A"}
       ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "Bps"
-        }
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      }
+      "fieldConfig": {"defaults": {"unit": "Bps"}},
+      "datasource": {"type": "prometheus", "uid": "VictoriaMetrics"}
     },
     {
-      "title": "Bytes Sent (Egress Traffic)",
+      "title": "Сравнение: Bytes Sent (Egress Traffic)",
       "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 8
-      },
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
       "targets": [
-        {
-          "expr": "sum(rate(nginx_server_bytes{host=~\"$vhost\",host!=\"*\",variant=~\"$variant\",direction=\"out\"}[1m]))",
-          "legendFormat": "nginx-vts-docker bytes_out/s",
-          "refId": "N"
-        },
-        {
-          "expr": "sum(rate(angie_http_server_zones_data_sent{variant=~\"$variant\",zone=~\"$vhost\"}[1m]))",
-          "legendFormat": "angie bytes_out/s",
-          "refId": "A"
-        }
+        {"expr": "sum(rate(nginx_server_bytes{host=~\"$vhost\",host!=\"*\",variant=~\"$variant\",direction=\"out\"}[1m]))", "legendFormat": "nginx-vts-docker bytes_out/s", "refId": "N"},
+        {"expr": "sum(rate(angie_http_server_zones_data_sent{variant=~\"$variant\",zone=~\"$vhost\"}[1m]))", "legendFormat": "angie bytes_out/s", "refId": "A"}
       ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "Bps"
-        }
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      }
+      "fieldConfig": {"defaults": {"unit": "Bps"}},
+      "datasource": {"type": "prometheus", "uid": "VictoriaMetrics"}
     },
     {
-      "title": "Upstream Request/Response Time (avg, ms)",
+      "title": "Сравнение: Vector Processed Events / Sent Bytes",
       "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 8
-      },
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
       "targets": [
-        {
-          "expr": "sum(rate(nginx_upstream_responseMsec{variant=~\"$variant\"}[1m])) / sum(rate(nginx_upstream_requests{variant=~\"$variant\"}[1m]))",
-          "legendFormat": "nginx-vts-docker",
-          "refId": "N"
-        },
-        {
-          "expr": "avg(nginx_upstream_requestMsec{variant=~\"$variant\"})",
-          "legendFormat": "nginx-vts requestMsec",
-          "refId": "R"
-        }
+        {"expr": "sum by (variant) (rate(vector_component_received_events_total{variant=~\"$variant\"}[1m]))", "legendFormat": "{{variant}} events/s", "refId": "E"},
+        {"expr": "sum by (variant) (rate(vector_component_sent_bytes_total{variant=~\"$variant\"}[1m]))", "legendFormat": "{{variant}} bytes/s", "refId": "B"}
       ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ms"
-        }
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "description": "nginx_upstream_requestMsec (время запроса к upstream) и nginx_upstream_responseMsec (время ответа от upstream) — avg. Распределение по backend'ам не показывается отдельно, т.к. backend один."
+      "fieldConfig": {"defaults": {"unit": "Bps"}},
+      "description": "Сводная панель метрик vector: events/s (processed) и bytes/s (sent в VictoriaLogs). По variant.",
+      "datasource": {"type": "prometheus", "uid": "VictoriaMetrics"}
     },
     {
-      "title": "Vector Processed Events",
-      "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 16
-      },
-      "targets": [
-        {
-          "expr": "sum by (variant) (rate(vector_component_received_events_total{variant=~\"$variant\"}[1m]))",
-          "legendFormat": "{{variant}} events/s",
-          "refId": "{"
-        }
-      ],
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      }
-    },
-    {
-      "title": "Vector Sent Bytes (to VictoriaLogs)",
-      "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 16
-      },
-      "targets": [
-        {
-          "expr": "sum by (variant) (rate(vector_component_sent_bytes_total{variant=~\"$variant\"}[1m]))",
-          "legendFormat": "{{variant}} bytes/s",
-          "refId": "{"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "Bps"
-        }
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      }
-    },
-    {
-      "title": "nginx-vts-docker — детали метрик",
+      "title": "Парные метрики nginx-vts (слева) vs angie (справа)",
       "type": "row",
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 24
-      },
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 16},
       "collapsed": false,
       "panels": [],
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      }
+      "datasource": {"type": "prometheus", "uid": "VictoriaMetrics"}
     },
     {
       "title": "nginx-vts: Connection states (active/reading/writing/waiting)",
       "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 25
-      },
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 17},
       "targets": [
-        {
-          "expr": "sum(nginx_server_connections{variant=~\"$variant\",status=\"active\"})",
-          "legendFormat": "active",
-          "refId": "A"
-        },
-        {
-          "expr": "sum(nginx_server_connections{variant=~\"$variant\",status=\"reading\"})",
-          "legendFormat": "reading",
-          "refId": "R"
-        },
-        {
-          "expr": "sum(nginx_server_connections{variant=~\"$variant\",status=\"writing\"})",
-          "legendFormat": "writing",
-          "refId": "W"
-        },
-        {
-          "expr": "sum(nginx_server_connections{variant=~\"$variant\",status=\"waiting\"})",
-          "legendFormat": "waiting",
-          "refId": "D"
-        }
+        {"expr": "sum(nginx_server_connections{variant=~\"$variant\",status=\"active\"})", "legendFormat": "active", "refId": "A"},
+        {"expr": "sum(nginx_server_connections{variant=~\"$variant\",status=\"reading\"})", "legendFormat": "reading", "refId": "R"},
+        {"expr": "sum(nginx_server_connections{variant=~\"$variant\",status=\"writing\"})", "legendFormat": "writing", "refId": "W"},
+        {"expr": "sum(nginx_server_connections{variant=~\"$variant\",status=\"waiting\"})", "legendFormat": "waiting", "refId": "D"}
       ],
-      "description": "Мгновенные значения состояний соединений (gauge).",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      }
+      "description": "Gauge: мгновенные значения состояний соединений.",
+      "datasource": {"type": "prometheus", "uid": "VictoriaMetrics"}
+    },
+    {
+      "title": "angie: Connection states (active/idle)",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 17},
+      "targets": [
+        {"expr": "sum(angie_connections_active{variant=~\"$variant\"})", "legendFormat": "active", "refId": "A"},
+        {"expr": "sum(angie_connections_idle{variant=~\"$variant\"})", "legendFormat": "idle", "refId": "I"}
+      ],
+      "description": "Gauge: текущие активные и простаивающие соединения. Аналог reading/writing/waiting у nginx-vts отсутствует — Angie не разделяет неактивные соединения по состояниям.",
+      "datasource": {"type": "prometheus", "uid": "VictoriaMetrics"}
     },
     {
       "title": "nginx-vts: Accepted/Handled connections, Requests (rate)",
       "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 25
-      },
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 25},
       "targets": [
-        {
-          "expr": "sum(rate(nginx_server_connections{variant=~\"$variant\",status=\"accepted\"}[1m]))",
-          "legendFormat": "accepted/s",
-          "refId": "A"
-        },
-        {
-          "expr": "sum(rate(nginx_server_connections{variant=~\"$variant\",status=\"handled\"}[1m]))",
-          "legendFormat": "handled/s",
-          "refId": "H"
-        },
-        {
-          "expr": "sum(rate(nginx_server_connections{variant=~\"$variant\",status=\"requests\"}[1m]))",
-          "legendFormat": "requests/s",
-          "refId": "R"
-        }
+        {"expr": "sum(rate(nginx_server_connections{variant=~\"$variant\",status=\"accepted\"}[1m]))", "legendFormat": "accepted/s", "refId": "A"},
+        {"expr": "sum(rate(nginx_server_connections{variant=~\"$variant\",status=\"handled\"}[1m]))", "legendFormat": "handled/s", "refId": "H"},
+        {"expr": "sum(rate(nginx_server_connections{variant=~\"$variant\",status=\"requests\"}[1m]))", "legendFormat": "requests/s", "refId": "R"}
       ],
-      "description": "Счётчики (counter) в виде rate.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      }
-    },
-    {
-      "title": "nginx-vts: Cache status (rate by status)",
-      "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 33
-      },
-      "targets": [
-        {
-          "expr": "sum by (status) (rate(nginx_server_cache{variant=~\"$variant\",host=~\"$vhost\",host!=\"*\"}[1m]))",
-          "legendFormat": "{{status}}/s",
-          "refId": "{"
-        }
-      ],
-      "description": "hit/miss/bypass/expired/revalidated/scarce/stale/updating. Агрегат host=* исключён (дублирует сумму по реальным vhost).",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      }
-    },
-    {
-      "title": "nginx-vts: Server Request Processing Time (ms)",
-      "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 33
-      },
-      "targets": [
-        {
-          "expr": "avg(nginx_server_requestMsec{variant=~\"$variant\",host=~\"$vhost\",host!=\"*\"})",
-          "legendFormat": "nginx-vts-docker",
-          "refId": "N"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ms"
-        }
-      },
-      "description": "Среднее время обработки запроса на стороне сервера.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      }
-    },
-    {
-      "title": "nginx-vts: HTTP responses by code class (rate)",
-      "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 41
-      },
-      "targets": [
-        {
-          "expr": "sum by (code) (rate(nginx_server_requests{variant=~\"$variant\",host=~\"$vhost\",host!=\"*\",code!=\"total\"}[1m]))",
-          "legendFormat": "{{code}}/s",
-          "refId": "{"
-        }
-      ],
-      "description": "1xx/2xx/3xx/4xx/5xx/total. Агрегат host=* исключён (дублирует сумму по реальным vhost).",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      }
-    },
-    {
-      "title": "nginx-vts: Upstream Bytes (rate by direction)",
-      "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 41
-      },
-      "targets": [
-        {
-          "expr": "sum by (direction) (rate(nginx_upstream_bytes{variant=~\"$variant\"}[1m]))",
-          "legendFormat": "{{direction}}/s",
-          "refId": "{"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "Bps"
-        }
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      }
-    },
-    {
-      "title": "nginx-vts: Upstream responses by code (rate)",
-      "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 49
-      },
-      "targets": [
-        {
-          "expr": "sum by (code) (rate(nginx_upstream_requests{variant=~\"$variant\"}[1m]))",
-          "legendFormat": "{{code}}/s",
-          "refId": "{"
-        }
-      ],
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      }
-    },
-    {
-      "title": "nginx-vts: Shared zones (usedsize/maxsize)",
-      "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 49
-      },
-      "targets": [
-        {
-          "expr": "sum by (memstat) (nginx_server_sharedzones{variant=~\"$variant\"})",
-          "legendFormat": "{{memstat}}",
-          "refId": "{"
-        }
-      ],
-      "description": "Использование shared-memory зоны ngx_http_vhost_traffic_status: usedsize и maxsize.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      }
-    },
-    {
-      "title": "angie — детали метрик",
-      "type": "row",
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 57
-      },
-      "collapsed": false,
-      "panels": [],
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      }
-    },
-    {
-      "title": "angie: Active/Idle connections",
-      "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 58
-      },
-      "targets": [
-        {
-          "expr": "sum(angie_connections_active{variant=~\"$variant\"})",
-          "legendFormat": "active",
-          "refId": "A"
-        },
-        {
-          "expr": "sum(angie_connections_idle{variant=~\"$variant\"})",
-          "legendFormat": "idle",
-          "refId": "I"
-        }
-      ],
-      "description": "Gauge: текущие активные и простаивающие соединения.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      }
+      "description": "Counter: принятые/обработанные соединения и суммарные запросы (rate).",
+      "datasource": {"type": "prometheus", "uid": "VictoriaMetrics"}
     },
     {
       "title": "angie: Accepted/Dropped connections (rate)",
       "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 58
-      },
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 25},
       "targets": [
-        {
-          "expr": "sum(rate(angie_connections_accepted{variant=~\"$variant\"}[1m]))",
-          "legendFormat": "accepted/s",
-          "refId": "A"
-        },
-        {
-          "expr": "sum(rate(angie_connections_dropped{variant=~\"$variant\"}[1m]))",
-          "legendFormat": "dropped/s",
-          "refId": "D"
-        }
+        {"expr": "sum(rate(angie_connections_accepted{variant=~\"$variant\"}[1m]))", "legendFormat": "accepted/s", "refId": "A"},
+        {"expr": "sum(rate(angie_connections_dropped{variant=~\"$variant\"}[1m]))", "legendFormat": "dropped/s", "refId": "D"}
       ],
-      "description": "Counter: принятые и сброшенные соединения.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      }
+      "description": "Counter: принятые и сброшенные соединения. Аналога handled/requests (в одном ряду с accepted) у angie нет — handled не экспортируется, requests учитываются в server_zones.",
+      "datasource": {"type": "prometheus", "uid": "VictoriaMetrics"}
+    },
+    {
+      "title": "nginx-vts: Server zone requests total (rate)",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 33},
+      "targets": [
+        {"expr": "sum(rate(nginx_server_requests{variant=~\"$variant\",host=~\"$vhost\",host!=\"*\",code=\"total\"}[1m]))", "legendFormat": "requests/s", "refId": "T"}
+      ],
+      "description": "Суммарные запросы server zone (rate) — аналог angie_http_server_zones_requests_total.",
+      "datasource": {"type": "prometheus", "uid": "VictoriaMetrics"}
     },
     {
       "title": "angie: Server zone requests (total rate, processing, discarded rate)",
       "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 66
-      },
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 33},
       "targets": [
-        {
-          "expr": "sum(rate(angie_http_server_zones_requests_total{variant=~\"$variant\",zone=~\"$vhost\"}[1m]))",
-          "legendFormat": "total/s",
-          "refId": "T"
-        },
-        {
-          "expr": "sum(angie_http_server_zones_requests_processing{variant=~\"$variant\",zone=~\"$vhost\"})",
-          "legendFormat": "processing",
-          "refId": "P"
-        },
-        {
-          "expr": "sum(rate(angie_http_server_zones_requests_discarded{variant=~\"$variant\",zone=~\"$vhost\"}[1m]))",
-          "legendFormat": "discarded/s",
-          "refId": "D"
-        }
+        {"expr": "sum(rate(angie_http_server_zones_requests_total{variant=~\"$variant\",zone=~\"$vhost\"}[1m]))", "legendFormat": "total/s", "refId": "T"},
+        {"expr": "sum(angie_http_server_zones_requests_processing{variant=~\"$variant\",zone=~\"$vhost\"})", "legendFormat": "processing", "refId": "P"},
+        {"expr": "sum(rate(angie_http_server_zones_requests_discarded{variant=~\"$variant\",zone=~\"$vhost\"}[1m]))", "legendFormat": "discarded/s", "refId": "D"}
       ],
-      "description": "Серверная зона server_zone: всего запросов (rate), в обработке (gauge), отброшено (rate).",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      }
+      "description": "Серверная зона server_zone: всего запросов (rate), в обработке (gauge), отброшено (rate). processing/discarded у nginx-vts аналогов не имеют.",
+      "datasource": {"type": "prometheus", "uid": "VictoriaMetrics"}
+    },
+    {
+      "title": "nginx-vts: HTTP responses by code class (rate)",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 41},
+      "targets": [
+        {"expr": "sum by (code) (rate(nginx_server_requests{variant=~\"$variant\",host=~\"$vhost\",host!=\"*\",code!=\"total\"}[1m]))", "legendFormat": "{{code}}/s", "refId": "{"}
+      ],
+      "description": "1xx/2xx/3xx/4xx/5xx по классам кодов. Агрегат host=* исключён.",
+      "datasource": {"type": "prometheus", "uid": "VictoriaMetrics"}
     },
     {
       "title": "angie: HTTP responses by code (rate)",
       "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 66
-      },
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 41},
       "targets": [
-        {
-          "expr": "sum by (code) (rate(angie_http_server_zones_responses{variant=~\"$variant\",zone=~\"$vhost\"}[1m]))",
-          "legendFormat": "{{code}}/s",
-          "refId": "{"
-        }
+        {"expr": "sum by (code) (rate(angie_http_server_zones_responses{variant=~\"$variant\",zone=~\"$vhost\"}[1m]))", "legendFormat": "{{code}}/s", "refId": "{"}
       ],
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      }
+      "description": "Ответы по кодам (1xx/2xx/3xx/4xx/5xx) в server zone.",
+      "datasource": {"type": "prometheus", "uid": "VictoriaMetrics"}
     },
     {
-      "title": "angie: Upstream keepalive connections",
+      "title": "nginx-vts: Server Request Processing Time (ms)",
       "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 74
-      },
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 49},
       "targets": [
-        {
-          "expr": "sum by (upstream) (angie_http_upstreams_keepalive{variant=~\"$variant\"})",
-          "legendFormat": "{{upstream}}",
-          "refId": "{"
-        }
+        {"expr": "avg(nginx_server_requestMsec{variant=~\"$variant\",host=~\"$vhost\",host!=\"*\"})", "legendFormat": "nginx-vts-docker", "refId": "N"}
       ],
-      "description": "Текущее число keepalive-соединений к upstream.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      }
+      "fieldConfig": {"defaults": {"unit": "ms"}},
+      "description": "Среднее время обработки запроса на стороне сервера (requestMsec). Аналога у angie нет — angie не экспортирует per-request processing time в server zone.",
+      "datasource": {"type": "prometheus", "uid": "VictoriaMetrics"}
     },
     {
-      "title": "angie: Upstream peer state",
+      "title": "angie: (нет аналога server requestMsec)",
       "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 74
-      },
-      "targets": [
-        {
-          "expr": "sum by (peer) (angie_http_upstreams_peers_state{variant=~\"$variant\"})",
-          "legendFormat": "{{peer}}",
-          "refId": "{"
-        }
-      ],
-      "description": "Состояние peer'а upstream (gauge: 0=up, др. значения = недоступен).",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      }
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 49},
+      "targets": [],
+      "description": "Заглушка: Angie не экспортирует среднее время обработки запроса в server zone (аналог nginx_server_requestMsec). Метрика отсутствует «из коробки». Панель оставлена для визуального параллелизма.",
+      "datasource": {"type": "prometheus", "uid": "VictoriaMetrics"}
     },
     {
-      "title": "angie: Upstream peers bytes (rate)",
+      "title": "nginx-vts: Cache status (rate by status)",
       "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 82
-      },
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 57},
       "targets": [
-        {
-          "expr": "sum(rate(angie_http_upstreams_peers_data_received{variant=~\"$variant\"}[1m]))",
-          "legendFormat": "received/s",
-          "refId": "R"
-        },
-        {
-          "expr": "sum(rate(angie_http_upstreams_peers_data_sent{variant=~\"$variant\"}[1m]))",
-          "legendFormat": "sent/s",
-          "refId": "S"
-        }
+        {"expr": "sum by (status) (rate(nginx_server_cache{variant=~\"$variant\",host=~\"$vhost\",host!=\"*\"}[1m]))", "legendFormat": "{{status}}/s", "refId": "{"}
       ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "Bps"
-        }
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      }
+      "description": "hit/miss/bypass/expired/revalidated/scarce/stale/updating. Агрегат host=* исключён.",
+      "datasource": {"type": "prometheus", "uid": "VictoriaMetrics"}
+    },
+    {
+      "title": "angie: (нет аналога cache status)",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 57},
+      "targets": [],
+      "description": "Заглушка: Angie в этом бенчмарке не настроен с кэшем, метрик cache status нет. Панель оставлена для визуального параллелизма.",
+      "datasource": {"type": "prometheus", "uid": "VictoriaMetrics"}
+    },
+    {
+      "title": "nginx-vts: Upstream responses by code (rate)",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 65},
+      "targets": [
+        {"expr": "sum by (code) (rate(nginx_upstream_requests{variant=~\"$variant\"}[1m]))", "legendFormat": "{{code}}/s", "refId": "{"}
+      ],
+      "description": "Ответы upstream по кодам (1xx/2xx/3xx/4xx/5xx).",
+      "datasource": {"type": "prometheus", "uid": "VictoriaMetrics"}
     },
     {
       "title": "angie: Upstream peers responses by code (rate)",
       "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 82
-      },
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 65},
       "targets": [
-        {
-          "expr": "sum by (code) (rate(angie_http_upstreams_peers_responses{variant=~\"$variant\"}[1m]))",
-          "legendFormat": "{{code}}/s",
-          "refId": "{"
-        }
+        {"expr": "sum by (code) (rate(angie_http_upstreams_peers_responses{variant=~\"$variant\"}[1m]))", "legendFormat": "{{code}}/s", "refId": "{"}
       ],
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      }
+      "description": "Ответы upstream peers по кодам.",
+      "datasource": {"type": "prometheus", "uid": "VictoriaMetrics"}
+    },
+    {
+      "title": "nginx-vts: Upstream Bytes (rate by direction)",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 73},
+      "targets": [
+        {"expr": "sum by (direction) (rate(nginx_upstream_bytes{variant=~\"$variant\"}[1m]))", "legendFormat": "{{direction}}/s", "refId": "{"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "Bps"}},
+      "description": "Байты upstream по направлению (in/out).",
+      "datasource": {"type": "prometheus", "uid": "VictoriaMetrics"}
+    },
+    {
+      "title": "angie: Upstream peers bytes (rate)",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 73},
+      "targets": [
+        {"expr": "sum(rate(angie_http_upstreams_peers_data_received{variant=~\"$variant\"}[1m]))", "legendFormat": "received/s", "refId": "R"},
+        {"expr": "sum(rate(angie_http_upstreams_peers_data_sent{variant=~\"$variant\"}[1m]))", "legendFormat": "sent/s", "refId": "S"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "Bps"}},
+      "description": "Байты upstream peers: received (in) и sent (out).",
+      "datasource": {"type": "prometheus", "uid": "VictoriaMetrics"}
+    },
+    {
+      "title": "nginx-vts: Upstream Request/Response Time (avg, ms)",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 81},
+      "targets": [
+        {"expr": "avg(nginx_upstream_requestMsec{variant=~\"$variant\"})", "legendFormat": "requestMsec (время к upstream)", "refId": "R"},
+        {"expr": "avg(nginx_upstream_responseMsec{variant=~\"$variant\"})", "legendFormat": "responseMsec (время ответа от upstream)", "refId": "S"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "ms"}},
+      "description": "nginx_upstream_requestMsec (время запроса к upstream) и nginx_upstream_responseMsec (время ответа от upstream) — avg. Аналога у angie нет.",
+      "datasource": {"type": "prometheus", "uid": "VictoriaMetrics"}
+    },
+    {
+      "title": "angie: Upstream peer state",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 81},
+      "targets": [
+        {"expr": "sum by (peer) (angie_http_upstreams_peers_state{variant=~\"$variant\"})", "legendFormat": "{{peer}}", "refId": "{"}
+      ],
+      "description": "Состояние peer'а upstream (gauge: 0=up, др. значения = недоступен). Аналога у nginx-vts нет.",
+      "datasource": {"type": "prometheus", "uid": "VictoriaMetrics"}
+    },
+    {
+      "title": "nginx-vts: Shared zones (usedsize/maxsize)",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 89},
+      "targets": [
+        {"expr": "sum by (memstat) (nginx_server_sharedzones{variant=~\"$variant\"})", "legendFormat": "{{memstat}}", "refId": "{"}
+      ],
+      "description": "Использование shared-memory зоны ngx_http_vhost_traffic_status: usedsize и maxsize.",
+      "datasource": {"type": "prometheus", "uid": "VictoriaMetrics"}
+    },
+    {
+      "title": "angie: Upstream keepalive connections",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 89},
+      "targets": [
+        {"expr": "sum by (upstream) (angie_http_upstreams_keepalive{variant=~\"$variant\"})", "legendFormat": "{{upstream}}", "refId": "{"}
+      ],
+      "description": "Текущее число keepalive-соединений к upstream. Аналога у nginx-vts нет.",
+      "datasource": {"type": "prometheus", "uid": "VictoriaMetrics"}
+    },
+    {
+      "title": "nginx-vts: (нет аналога upstream health/selected)",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 97},
+      "targets": [],
+      "description": "Заглушка: nginx-vts не экспортирует health (fails/unavailable/downtime) и selected (current/total) по upstream peers. Панель оставлена для визуального параллелизма.",
+      "datasource": {"type": "prometheus", "uid": "VictoriaMetrics"}
     },
     {
       "title": "angie: Upstream peers health (fails/unavailable rate, downtime)",
       "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 90
-      },
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 97},
       "targets": [
-        {
-          "expr": "sum(rate(angie_http_upstreams_peers_health_fails{variant=~\"$variant\"}[1m]))",
-          "legendFormat": "fails/s",
-          "refId": "F"
-        },
-        {
-          "expr": "sum(rate(angie_http_upstreams_peers_health_unavailable{variant=~\"$variant\"}[1m]))",
-          "legendFormat": "unavailable/s",
-          "refId": "U"
-        },
-        {
-          "expr": "sum(angie_http_upstreams_peers_health_downtime{variant=~\"$variant\"})",
-          "legendFormat": "downtime (s)",
-          "refId": "D"
-        }
+        {"expr": "sum(rate(angie_http_upstreams_peers_health_fails{variant=~\"$variant\"}[1m]))", "legendFormat": "fails/s", "refId": "F"},
+        {"expr": "sum(rate(angie_http_upstreams_peers_health_unavailable{variant=~\"$variant\"}[1m]))", "legendFormat": "unavailable/s", "refId": "U"},
+        {"expr": "sum(angie_http_upstreams_peers_health_downtime{variant=~\"$variant\"})", "legendFormat": "downtime (s)", "refId": "D"}
       ],
       "description": "fails/unavailable — counter (rate); downtime — gauge в секундах.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      }
+      "datasource": {"type": "prometheus", "uid": "VictoriaMetrics"}
+    },
+    {
+      "title": "nginx-vts: (нет аналога upstream selected)",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 105},
+      "targets": [],
+      "description": "Заглушка: nginx-vts не экспортирует selected (current/total) по upstream peers. Панель оставлена для визуального параллелизма.",
+      "datasource": {"type": "prometheus", "uid": "VictoriaMetrics"}
     },
     {
       "title": "angie: Upstream peers selected (current, total rate)",
       "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 90
-      },
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 105},
       "targets": [
-        {
-          "expr": "sum(angie_http_upstreams_peers_selected_current{variant=~\"$variant\"})",
-          "legendFormat": "current",
-          "refId": "C"
-        },
-        {
-          "expr": "sum(rate(angie_http_upstreams_peers_selected_total{variant=~\"$variant\"}[1m]))",
-          "legendFormat": "total/s",
-          "refId": "T"
-        }
+        {"expr": "sum(angie_http_upstreams_peers_selected_current{variant=~\"$variant\"})", "legendFormat": "current", "refId": "C"},
+        {"expr": "sum(rate(angie_http_upstreams_peers_selected_total{variant=~\"$variant\"}[1m]))", "legendFormat": "total/s", "refId": "T"}
       ],
       "description": "current — gauge (текущие выбранные); total — counter (rate).",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      }
+      "datasource": {"type": "prometheus", "uid": "VictoriaMetrics"}
+    },
+    {
+      "title": "nginx-vts: (нет аналога slabs)",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 113},
+      "targets": [],
+      "description": "Заглушка: nginx-vts не экспортирует slabs (pages free/used, slots по размерам). Панель оставлена для визуального параллелизма.",
+      "datasource": {"type": "prometheus", "uid": "VictoriaMetrics"}
     },
     {
       "title": "angie: Slabs pages (free/used)",
       "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 98
-      },
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 113},
       "targets": [
-        {
-          "expr": "sum(angie_slabs_pages_free{variant=~\"$variant\"})",
-          "legendFormat": "free",
-          "refId": "F"
-        },
-        {
-          "expr": "sum(angie_slabs_pages_used{variant=~\"$variant\"})",
-          "legendFormat": "used",
-          "refId": "U"
-        }
+        {"expr": "sum(angie_slabs_pages_free{variant=~\"$variant\"})", "legendFormat": "free", "refId": "F"},
+        {"expr": "sum(angie_slabs_pages_used{variant=~\"$variant\"})", "legendFormat": "used", "refId": "U"}
       ],
       "description": "Shared-memory slab zones (upstream_backend): свободные/занятые страницы.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      }
+      "datasource": {"type": "prometheus", "uid": "VictoriaMetrics"}
+    },
+    {
+      "title": "nginx-vts: (нет аналога slabs slots)",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 121},
+      "targets": [],
+      "description": "Заглушка: nginx-vts не экспортирует слоты slab-страниц по размерам. Панель оставлена для визуального параллелизма.",
+      "datasource": {"type": "prometheus", "uid": "VictoriaMetrics"}
     },
     {
       "title": "angie: Slabs pages slots (used/free by size)",
       "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 98
-      },
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 121},
       "targets": [
-        {
-          "expr": "sum by (size) (angie_slabs_pages_slots_used{variant=~\"$variant\"})",
-          "legendFormat": "used {{size}}",
-          "refId": "U"
-        },
-        {
-          "expr": "sum by (size) (angie_slabs_pages_slots_free{variant=~\"$variant\"})",
-          "legendFormat": "free {{size}}",
-          "refId": "F"
-        }
+        {"expr": "sum by (size) (angie_slabs_pages_slots_used{variant=~\"$variant\"})", "legendFormat": "used {{size}}", "refId": "U"},
+        {"expr": "sum by (size) (angie_slabs_pages_slots_free{variant=~\"$variant\"})", "legendFormat": "free {{size}}", "refId": "F"}
       ],
       "description": "Слоты страниц по размеру: занятые и свободные.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      }
+      "datasource": {"type": "prometheus", "uid": "VictoriaMetrics"}
+    },
+    {
+      "title": "nginx-vts: (нет аналога slabs slots activity)",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 129},
+      "targets": [],
+      "description": "Заглушка: nginx-vts не экспортирует активность слотов (reqs/fails) по размерам. Панель оставлена для визуального параллелизма.",
+      "datasource": {"type": "prometheus", "uid": "VictoriaMetrics"}
     },
     {
       "title": "angie: Slabs pages slots activity (reqs/fails rate by size)",
       "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 106
-      },
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 129},
       "targets": [
-        {
-          "expr": "sum by (size) (rate(angie_slabs_pages_slots_reqs{variant=~\"$variant\"}[1m]))",
-          "legendFormat": "reqs {{size}}/s",
-          "refId": "R"
-        },
-        {
-          "expr": "sum by (size) (rate(angie_slabs_pages_slots_fails{variant=~\"$variant\"}[1m]))",
-          "legendFormat": "fails {{size}}/s",
-          "refId": "F"
-        }
+        {"expr": "sum by (size) (rate(angie_slabs_pages_slots_reqs{variant=~\"$variant\"}[1m]))", "legendFormat": "reqs {{size}}/s", "refId": "R"},
+        {"expr": "sum by (size) (rate(angie_slabs_pages_slots_fails{variant=~\"$variant\"}[1m]))", "legendFormat": "fails {{size}}/s", "refId": "F"}
       ],
       "description": "Запросы и неудачи выделения слотов по размерам.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      }
+      "datasource": {"type": "prometheus", "uid": "VictoriaMetrics"}
     }
   ],
   "refresh": "10s",
-  "time": {
-    "from": "now-30m",
-    "to": "now"
-  },
+  "time": {"from": "now-30m", "to": "now"},
   "templating": {
     "list": [
       {
@@ -771,45 +372,31 @@
         "type": "query",
         "label": "Variant",
         "description": "Прокси-вариант: nginx-vts-docker или angie (лейбл variant из метрик)",
-        "datasource": {
-          "type": "prometheus",
-          "uid": "VictoriaMetrics"
-        },
+        "datasource": {"type": "prometheus", "uid": "VictoriaMetrics"},
         "query": "label_values(variant)",
         "refresh": 1,
         "sort": 1,
         "multi": true,
         "includeAll": true,
-        "current": {
-          "selected": true,
-          "text": "All",
-          "value": "$__all"
-        }
+        "current": {"selected": true, "text": "All", "value": "$__all"}
       },
       {
         "name": "vhost",
         "type": "query",
         "label": "VHost (host/zone)",
         "description": "Виртуальный хост: лейбл host для nginx-vts, zone для angie (server_name/Host запроса)",
-        "datasource": {
-          "type": "prometheus",
-          "uid": "VictoriaMetrics"
-        },
+        "datasource": {"type": "prometheus", "uid": "VictoriaMetrics"},
         "query": "query_result(label_replace(nginx_server_requests{variant=~\"$variant\"}, \"vhost\", \"$1\", \"host\", \"(.+)\") or label_replace(angie_http_server_zones_requests_total{variant=~\"$variant\"}, \"vhost\", \"$1\", \"zone\", \"(.+)\"))",
         "regex": "/vhost=\"([^\"]+)\"/",
         "refresh": 1,
         "sort": 1,
         "multi": true,
         "includeAll": true,
-        "current": {
-          "selected": true,
-          "text": "All",
-          "value": "$__all"
-        }
+        "current": {"selected": true, "text": "All", "value": "$__all"}
       }
     ]
   },
   "uid": "nginx-vts-vs-angie-benchmark",
   "schemaVersion": 39,
-  "version": 3
+  "version": 4
 }
