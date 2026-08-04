@@ -50,7 +50,8 @@ write_files:
 
           upstream backend {
               zone upstream_backend 64k;
-              server ${backend_addr};
+              server ${backend_addr_1};
+              server ${backend_addr_2};
               keepalive 64;
           }
 

@@ -38,7 +38,8 @@ write_files:
           vhost_traffic_status_filter_by_host on;
 
           upstream backend {
-              server ${backend_addr};
+              server ${backend_addr_1};
+              server ${backend_addr_2};
               keepalive 64;
           }
 
@@ -219,11 +220,19 @@ write_files:
 runcmd:
   - mkdir -p /var/lib/vector /var/log/nginx
   - install -m 0755 -d /etc/apt/keyrings
-  - curl -fsSL https://mirror.yandex.ru/mirrors/download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+  - curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
   - chmod a+r /etc/apt/keyrings/docker.gpg
-  - echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://mirror.yandex.ru/mirrors/download.docker.com/linux/ubuntu $(lsb_release -cs) stable" > /etc/apt/sources.list.d/docker.list
-  - apt-get update
-  - apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+  - |
+    # Пробуем зеркало Яндекса; если apt-get install падает (рассинхрон Packages.bz2),
+    # переключаемся на прямой download.docker.com и повторяем.
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://mirror.yandex.ru/mirrors/download.docker.com/linux/ubuntu $(lsb_release -cs) stable" > /etc/apt/sources.list.d/docker.list
+    apt-get update
+    if ! apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin; then
+      echo "Яндекс-зеркало download.docker.com рассинхронизировано; переключаемся на прямой download.docker.com"
+      echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" > /etc/apt/sources.list.d/docker.list
+      apt-get update
+      apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    fi
   - systemctl enable docker
   - systemctl start docker
   - docker compose -f /opt/nginx-vts-docker/docker-compose.yml up -d --build

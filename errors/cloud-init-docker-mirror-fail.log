@@ -1,0 +1,24 @@
+=== ОШИБКА: cloud-init на VM nginx-vts-docker не смог установить docker-ce ===
+Дата: 2026-08-04T04:05:00Z
+
+Причина:
+  Зеркало mirror.yandex.ru/mirrors/download.docker.com в процессе синхронизации —
+  размер Packages.bz2 не совпадает (84406 != 84556), apt-get не может прочитать индекс.
+  В результате docker-ce не установлен, docker compose up не выполняется, сервисы на VM не поднимаются.
+
+Ошибка из /var/log/cloud-init-output.log:
+  Err:6 https://mirror.yandex.ru/mirrors/download.docker.com/linux/ubuntu jammy/stable amd64 Packages
+    File has unexpected size (84406 != 84556). Mirror sync in progress?
+  E: Failed to fetch .../Packages.bz2
+  E: Package 'docker-ce' has no installation candidate
+  E: Unable to locate package docker-ce-cli / containerd.io / docker-buildx-plugin / docker-compose-plugin
+
+Влияние:
+  k6-nginx-vts-docker job не сможет получить HTTP 200 от прокси (502/000), бенчмарк невалиден.
+
+Решение:
+  Инфраструктурная проблема Яндекса. В cloud-init (benchmark/cloud-init/nginx-vts-docker.yaml)
+  добавлен fallback: если apt-get install docker-ce падает на яндексовском зеркале,
+  runcmd переключается на прямой download.docker.com и повторяет установку.
+  После пересоздания VM (terraform destroy -target=yandex_compute_instance.nginx-vts-docker
+  -auto-approve && terraform apply -auto-approve) cloud-init отрабатывает с fallback успешно.

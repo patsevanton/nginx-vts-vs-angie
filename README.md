@@ -3,6 +3,8 @@
 Инфраструктура как код (Terraform) и методика объективного сравнения двух популярных веб-прокси: **nginx с модулем VTS** (nginx-module-vts + nginx-vts-exporter) и **Angie** (форк nginx от «Веб-Сервера» с нативной поддержкой метрик Prometheus). Бенчмарк полностью воспроизводим: от развёртывания VM и Kubernetes-кластера до Grafana-дашборда с результатами.
 
 > **Требование к версии Kubernetes:** бенчмарк проверен на **Managed Kubernetes 1.33** (release channel `STABLE`). В `k8s.tf` версия жёстко задана как `1.33` и для master, и для node group. Yandex Managed Kubernetes также поддерживает 1.32/1.34/1.35 (канал `RAPID`/`REGULAR`) — если хотите другую версию, измените `version` в `k8s.tf` (две позиции: `master.version` и `yandex_kubernetes_node_group.k8s-node-group.version`). На 1.32 и младше Helm-чарт `victoria-metrics-k8s-stack 0.87.0` может требовать более старых API-версий CRD.
+>
+> **Требование к версии чарта VictoriaMetrics:** `victoria-metrics-k8s-stack 0.87.0` содержит баг `config-reloader` на K8s 1.33 — VMAgent не перечитывает Secret со скрейп-конфигом при пересоздании VM/смене IP, скрейпы идут на устаревшие адреса (см. <https://github.com/VictoriaMetrics/helm-charts/issues/3136>, status: `waiting for release`). После выхода исправления в upstream обновить `--version` в `README.md` (шаг 3) и `k8s.tf` (если задано) до версии, закрывающей issue #3136. До тех пор использовать workaround: `kubectl rollout restart deployment vmagent-vm-stack -n vmks` после смены IP VM.
 
 ## Ключевые результаты
 
@@ -19,17 +21,25 @@
 ## Архитектура
 
 ```
-┌─────────────────┐     ┌──────────────────────────────────┐     ┌──────────────────────┐
-│   Источник       │     │   Прокси (отдельные VM)          │     │   Приёмник (K8s)     │
-│   трафика (k6)  │────▶│                                  │────▶│                      │
-│   в K8s         │     │  VM1: nginx-vts (docker-compose) │     │  Backend (http-echo) │
-│                 │     │    + nginx-vts-exporter :9913     │     │  в namespace         │
-│                 │     │    + vector (логи → VictoriaLogs) │     │  "benchmark"         │
-│                 │     │                                  │     │                      │
-│                 │     │  VM2: angie                      │     │                      │
-│                 │     │    + нативные метрики :80/metrics │     │                      │
-│                 │     │    + vector (логи → VictoriaLogs) │     │                      │
-└─────────────────┘     └──────────────────────────────────┘     └──────────────────────┘
+┌─────────────────┐     ┌──────────────────────────────────┐     ┌────────────────────────────────┐
+│   Источник       │     │   Прокси (отдельные VM)          │     │   Приёмник (K8s)               │
+│   трафика (k6)  │────▶│                                  │────▶│                                │
+│   в K8s         │     │  VM1: nginx-vts (docker-compose) │     │  2 backend'а для nginx-vts:   │
+│                 │     │    + nginx-vts-exporter :9913     │     │   backend-vts-1 (NodePort 30081)│
+│                 │     │    + vector (логи → VictoriaLogs) │     │   backend-vts-2 (NodePort 30082)│
+│                 │     │    upstream backend {            │     │   (http-echo, replicas: 1)      │
+│                 │     │     server <node_ip>:30081;       │     │                                │
+│                 │     │     server <node_ip>:30082;       │     │  2 backend'а для angie:        │
+│                 │     │   }                              │     │   backend-angie-1 (NodePort 30083)│
+│                 │     │                                  │     │   backend-angie-2 (NodePort 30084)│
+│                 │     │  VM2: angie                      │     │   (http-echo, replicas: 1)      │
+│                 │     │    + нативные метрики :80/metrics │     │                                │
+│                 │     │    + vector (логи → VictoriaLogs) │     │  upstreamZones / peers:         │
+│                 │     │    upstream backend {            │     │   2 peer'а на прокси            │
+│                 │     │     server <node_ip>:30083;       │     │                                │
+│                 │     │     server <node_ip>:30084;       │     │                                │
+│                 │     │   }                              │     │                                │
+└─────────────────┘     └──────────────────────────────────┘     └────────────────────────────────┘
           │                          │                                      │
           │                          ▼                                      │
           │               ┌──────────────────┐                              │
@@ -39,6 +49,8 @@
           │               └──────────────────┘                              │
           └─────────────── k6 metrics ─────────────────────────────────────┘
 ```
+
+Каждый прокси балансирует на **2 отдельных бэкенда** через upstream (round-robin): nginx-vts → `backend-vts-1` (NodePort 30081) + `backend-vts-2` (NodePort 30082), angie → `backend-angie-1` (NodePort 30083) + `backend-angie-2` (NodePort 30084). Бэкенды — отдельные Deployment+Service (по 1 поду `hashicorp/http-echo` каждый) в namespace `benchmark`. Разделение нужно, чтобы нагрузка двух прокси не суммировалась на одном поде, а в метриках upstream (`nginx_upstream_*`, `angie_http_upstreams_peers_*`) было видно 2 peer'а.
 
 ## Сравниваемые варианты
 
@@ -103,12 +115,13 @@
 | `k8s.tf` | K8s-кластер, ноды, Helm-релиз Ingress, генерация values с IP |
 | `variables.tf` | Переменные (backend_nodeport, vlinsert_addr) |
 | `benchmark-vms.tf` | 2 VM для nginx-vts-docker, angie |
-| `benchmark-k8s.tf` | Namespace "benchmark", backend, ConfigMap с k6-скриптом |
+| `benchmark-k8s.tf` | Namespace "benchmark", 4 бэкенда (2 для vts, 2 для angie), ConfigMap с k6-скриптом |
 | `benchmark-runners.tf` | k6 Job для каждого варианта |
 | `values/victoriametrics-values.yaml` | Helm values: VictoriaMetrics + Grafana + vmagent (генерируется) |
 | `values/victoria-logs-cluster-values.yaml` | Helm values: VictoriaLogs cluster + vlinsert ingress (генерируется) |
 | `values/victoria-logs-collector-values.yaml` | Helm values: лог-коллектор |
 | `values/*.tftpl` | Шаблоны values (рендерятся Terraform через `templatefile`) |
+| `benchmark/templates/backend.yaml.tftpl` | Шаблон бэкенда (Deployment+Service, NodePort) — рендерится 4 раза: backend-vts-1/2, backend-angie-1/2 |
 | `benchmark/k6/benchmark.js` | k6 скрипт нагрузки |
 | `benchmark/cloud-init/*.yaml` | cloud-init для каждой VM |
 | `benchmark/configs/*.conf` | nginx/angie конфигурации |
@@ -149,6 +162,16 @@ helm upgrade --install vmks \
   --version 0.87.0 \
   --namespace vmks --create-namespace \
   -f ./values/victoriametrics-values.yaml
+
+# ВНИМАНИЕ: версия victoria-metrics-k8s-stack 0.87.0 содержит баг config-reloader'а VMAgent
+# на Kubernetes 1.33 — config-reloader не может перечитать Secret с конфигом скрейпов
+# (ошибка "cannot list resource secrets", VMAgent бегает со устаревшим конфигом и не подхватывает
+# новые VMServiceScrape targets при пересоздании VM / смене IP). См.
+# https://github.com/VictoriaMetrics/helm-charts/issues/3136 (waiting for release).
+# Workaround: после изменения IP VM перезапускать под vmagent (kubectl rollout restart
+# deployment vmagent-vm-stack -n vmks) — Secret обновляется оператором, но без рестарта
+# config-reloader его не перечитывает. Требуется: после выхода исправления обновить чарт
+# до версии, где issue #3136 закрыт (помечено "waiting for release" в upstream).
 
 # VictoriaLogs cluster
 helm upgrade --install vlcluster \
@@ -282,7 +305,8 @@ http {
 
     upstream backend {
         zone upstream_backend 64k;             # обязательно для сбора статистики upstream
-        server <backend>:<port>;
+        server <node_ip>:30083;                 # backend-angie-1 (NodePort)
+        server <node_ip>:30084;                 # backend-angie-2 (NodePort)
         keepalive 64;
     }
 
@@ -325,14 +349,15 @@ location /console/ {
 
 Remap-трансформы добавляют поле `instance` (stream label) и человекочитаемый `msg` (`METHOD URI STATUS`), поэтому в VictoriaLogs логи удобно фильтровать по `_stream:{instance="angie"}`.
 
-## Особенность сборки nginx-vts-docker (Docker Hub mirror)
+## Особенность сборки nginx-vts-docker (Docker Hub mirror + fallback apt-зеркала)
 
 cloud-init VM `nginx-vts-docker` собирает образ `nginx:1.31.3-trixie` и тянет `timberio/vector:0.57.0-debian` с Docker Hub. Иногда `production.cloudfront.docker.com` (CDN Docker Hub) отдаёт `i/o timeout` из сети Yandex Cloud — cloud-init падает на `docker compose up`, и сервисы на VM не поднимаются. Чтобы этого избежать, в `benchmark/cloud-init/nginx-vts-docker.yaml`:
 
 1. **`/etc/docker/daemon.json`** с `"registry-mirrors": ["https://mirror.gcr.io"]` — Docker тянет образы через публичный mirror `mirror.gcr.io` (Google), который стабильно доступен из Yandex Cloud и кэширует Docker Hub.
 2. **Retry `docker pull`** для `timberio/vector:0.57.0-debian` и `nginx:1.31.3-trixie` (5 попыток с паузой 10с) + повторный `docker compose up --build`, если первый запуск не поднял контейнер `nginx-vts`.
+3. **Fallback apt-репозитория Docker** — `runcmd` сначала пробует зеркало `mirror.yandex.ru/mirrors/download.docker.com` (быстрее из сети Yandex Cloud), а если `apt-get install docker-ce` падает (яндексовское зеркало периодически рассинхронизируется: размер `Packages.bz2` не совпадает, `Package 'docker-ce' has no installation candidate`), переключается на прямой `download.docker.com` и повторяет установку. Без этого fallback cloud-init завершается с `status: error`, docker не установлен, сервисы не поднимаются.
 
-Проверено из VM Yandex Cloud: `mirror.gcr.io/v2/timberio/vector/manifests/0.57.0-debian` → `HTTP 200` (тогда как прямой `registry-1.docker.io` периодически таймаутит).
+Проверено из VM Yandex Cloud: `mirror.gcr.io/v2/timberio/vector/manifests/0.57.0-debian` → `HTTP 200` (тогда как прямой `registry-1.docker.io` периодически таймаутит). Прямой `download.docker.com/linux/ubuntu/dists/jammy/stable/binary-amd64/Packages.bz2` → `HTTP 200` с корректным размером (тогда как `mirror.yandex.ru` в моменты синхронизации отдаёт неверный размер).
 
 ## k6 сценарий нагрузки
 

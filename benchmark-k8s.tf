@@ -5,13 +5,23 @@ locals {
     namespace = local.benchmark_namespace
   })
 
-  benchmark_backend_deployment_config = templatefile("${path.module}/benchmark/templates/backend-deployment.yaml.tftpl", {
-    namespace = local.benchmark_namespace
-  })
+  # 4 отдельных бэкенда: 2 для nginx-vts, 2 для angie.
+  # Каждый бэкенд — собственный Deployment + Service (NodePort), params: name, node_port.
+  benchmark_backends = {
+    "backend-vts-1"   = var.backend_nodeport_vts_1
+    "backend-vts-2"   = var.backend_nodeport_vts_2
+    "backend-angie-1" = var.backend_nodeport_angie_1
+    "backend-angie-2" = var.backend_nodeport_angie_2
+  }
 
-  benchmark_backend_service_config = templatefile("${path.module}/benchmark/templates/backend-service.yaml.tftpl", {
-    namespace = local.benchmark_namespace
-  })
+  benchmark_backend_configs = {
+    for name, node_port in local.benchmark_backends :
+    name => templatefile("${path.module}/benchmark/templates/backend.yaml.tftpl", {
+      name      = name
+      namespace = local.benchmark_namespace
+      node_port = node_port
+    })
+  }
 
   benchmark_k6_script_config = templatefile("${path.module}/benchmark/templates/k6-script-configmap.yaml.tftpl", {
     namespace    = local.benchmark_namespace
@@ -31,15 +41,11 @@ resource "local_file" "benchmark_namespace" {
   file_permission = "0644"
 }
 
-resource "local_file" "benchmark_backend_deployment" {
-  content         = local.benchmark_backend_deployment_config
-  filename        = "${path.module}/benchmark/manifests/backend-deployment.yaml"
-  file_permission = "0644"
-}
+resource "local_file" "benchmark_backends" {
+  for_each = local.benchmark_backend_configs
 
-resource "local_file" "benchmark_backend_service" {
-  content         = local.benchmark_backend_service_config
-  filename        = "${path.module}/benchmark/manifests/backend-service.yaml"
+  content         = each.value
+  filename        = "${path.module}/benchmark/manifests/${each.key}.yaml"
   file_permission = "0644"
 }
 
@@ -58,6 +64,6 @@ resource "local_file" "benchmark_k6_env" {
 output "kubectl_apply_benchmark_command" {
   value = <<-EOT
     kubectl apply -f ${local_file.benchmark_namespace.filename}
-    kubectl apply -f ${local_file.benchmark_backend_deployment.filename} -f ${local_file.benchmark_backend_service.filename} -f ${local_file.benchmark_k6_script.filename} -f ${local_file.benchmark_k6_env.filename}
+    kubectl apply -f ${local_file.benchmark_backends["backend-vts-1"].filename} -f ${local_file.benchmark_backends["backend-vts-2"].filename} -f ${local_file.benchmark_backends["backend-angie-1"].filename} -f ${local_file.benchmark_backends["backend-angie-2"].filename} -f ${local_file.benchmark_k6_script.filename} -f ${local_file.benchmark_k6_env.filename}
   EOT
 }

@@ -3,10 +3,15 @@ data "kubernetes_nodes" "nodes" {
 }
 
 locals {
-  # Внутренний IP первой ноды K8s (NodePort backend слушает на всех нодах)
+  # Внутренний IP первой ноды K8s (NodePort backend'ов слушает на всех нодах)
   node_addresses       = data.kubernetes_nodes.nodes.nodes[0].status[0].addresses
   k8s_node_internal_ip = [for a in local.node_addresses : a.address if a.type == "InternalIP"][0]
-  backend_addr         = "${local.k8s_node_internal_ip}:${var.backend_nodeport}"
+  # Раздельные backend'ы для каждого прокси: 2 NodePort на vts, 2 NodePort на angie.
+  # Каждый прокси балансирует через upstream с 2 server'ами -> в метриках upstream видно 2 peer'а.
+  backend_addr_vts_1   = "${local.k8s_node_internal_ip}:${var.backend_nodeport_vts_1}"
+  backend_addr_vts_2   = "${local.k8s_node_internal_ip}:${var.backend_nodeport_vts_2}"
+  backend_addr_angie_1 = "${local.k8s_node_internal_ip}:${var.backend_nodeport_angie_1}"
+  backend_addr_angie_2 = "${local.k8s_node_internal_ip}:${var.backend_nodeport_angie_2}"
   # Публичный адрес vlinsert для vector на VM. Берём из текущего IP балансировщика,
   # чтобы при пересоздании IP Terraform'ом cloud-init всегда получал актуальный host.
   vlinsert_addr        = "vlinsert.${yandex_vpc_address.addr.external_ipv4_address[0].address}.sslip.io:80"
@@ -42,8 +47,9 @@ resource "yandex_compute_instance" "nginx-vts-docker" {
   metadata = {
     ssh-keys  = "ubuntu:${file("~/.ssh/id_ed25519.pub")}"
     user-data = templatefile("${path.module}/benchmark/cloud-init/nginx-vts-docker.yaml", {
-      backend_addr  = local.backend_addr
-      vlinsert_addr = local.vlinsert_addr
+      backend_addr_1 = local.backend_addr_vts_1
+      backend_addr_2 = local.backend_addr_vts_2
+      vlinsert_addr  = local.vlinsert_addr
     })
   }
 }
@@ -78,8 +84,9 @@ resource "yandex_compute_instance" "angie" {
   metadata = {
     ssh-keys  = "ubuntu:${file("~/.ssh/id_ed25519.pub")}"
     user-data = templatefile("${path.module}/benchmark/cloud-init/angie.yaml", {
-      backend_addr  = local.backend_addr
-      vlinsert_addr = local.vlinsert_addr
+      backend_addr_1 = local.backend_addr_angie_1
+      backend_addr_2 = local.backend_addr_angie_2
+      vlinsert_addr  = local.vlinsert_addr
     })
   }
 }
