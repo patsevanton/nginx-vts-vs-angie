@@ -31,7 +31,8 @@
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
-      }
+      },
+      "description": "Запросов в секунду (RPS) по вариантам. Метрики:\n• nginx-vts: `nginx_server_requests{code=\"total\"}` (counter, rate за 1m) — суммарные запросы server zone, агрегат host=* исключён.\n• angie: `angie_http_server_zones_requests_total` (counter, rate за 1m) — суммарные запросы server zone."
     },
     {
       "title": "Сравнение: Bytes Received (Ingress Traffic)",
@@ -62,7 +63,8 @@
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
-      }
+      },
+      "description": "Входящий трафик (байты/с, полученные сервером от клиентов). Метрики:\n• nginx-vts: `nginx_server_bytes{direction=\"in\"}` (counter, rate за 1m).\n• angie: `angie_http_server_zones_data_received` (counter, rate за 1m).\nЕдиница: Bps."
     },
     {
       "title": "Сравнение: Bytes Sent (Egress Traffic)",
@@ -93,7 +95,8 @@
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
-      }
+      },
+      "description": "Исходящий трафик (байты/с, отправленные сервером клиентам). Метрики:\n• nginx-vts: `nginx_server_bytes{direction=\"out\"}` (counter, rate за 1m).\n• angie: `angie_http_server_zones_data_sent` (counter, rate за 1m).\nЕдиница: Bps."
     },
     {
       "title": "Сравнение: Vector Processed Events (events/s)",
@@ -116,7 +119,7 @@
           "unit": "ops"
         }
       },
-      "description": "События, обработанные vector (events/s), по variant.",
+      "description": "События, обработанные vector (events/s), по variant. Метрика: `vector_component_received_events_total` (counter, rate за 1m). Единица: ops.",
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
@@ -143,7 +146,7 @@
           "unit": "Bps"
         }
       },
-      "description": "Байты, отправленные vector в VictoriaLogs (bytes/s), по variant.",
+      "description": "Байты, отправленные vector в VictoriaLogs (bytes/s), по variant. Метрика: `vector_component_sent_bytes_total` (counter, rate за 1m). Единица: Bps.",
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
@@ -163,7 +166,8 @@
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
-      }
+      },
+      "description": "Один общий row: похожие метрики nginx-vts (слева, x:0) и angie (справа, x:12) размещены парами по темам — Connection states → Accepted/Handled → Server zone requests → HTTP responses by code → Server requestMsec → Cache status → Upstream responses/bytes/time → Shared zones/keepalive → Upstream health/selected → Slabs. Метрики без аналога — заглушки «(нет аналога …)» с пустым списком targets для визуального параллелизма."
     },
     {
       "title": "nginx-vts: Connection states (active/reading/writing/waiting)",
@@ -196,7 +200,7 @@
           "refId": "D"
         }
       ],
-      "description": "Gauge: мгновенные значения состояний соединений.",
+      "description": "Мгновенные значения состояний соединений (gauge). Метрика: `nginx_server_connections{status=...}` — 4 серии по лейблу status:\n• active — активные соединения\n• reading — читающие заголовки\n• writing — возвращающие ответ\n• waiting — ожидающие (keepalive).",
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
@@ -223,7 +227,7 @@
           "refId": "I"
         }
       ],
-      "description": "Gauge: текущие активные и простаивающие соединения. Аналог reading/writing/waiting у nginx-vts отсутствует — Angie не разделяет неактивные соединения по состояниям.",
+      "description": "Текущие активные и простаивающие соединения (gauge). Метрики:\n• `angie_connections_active` — активные\n• `angie_connections_idle` — простаивающие\nАналог reading/writing/waiting у nginx-vts отсутствует — Angie не разделяет неактивные соединения по состояниям.",
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
@@ -255,7 +259,7 @@
           "refId": "R"
         }
       ],
-      "description": "Counter: принятые/обработанные соединения и суммарные запросы (rate).",
+      "description": "Счётчики соединений и запросов (counter, rate за 1m). Метрика: `nginx_server_connections{status=...}` — 3 серии по лейблу status:\n• accepted — принятые соединения\n• handled — обработанные соединения\n• requests — суммарные запросы",
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
@@ -282,7 +286,7 @@
           "refId": "D"
         }
       ],
-      "description": "Counter: принятые и сброшенные соединения. Аналога handled/requests (в одном ряду с accepted) у angie нет — handled не экспортируется, requests учитываются в server_zones.",
+      "description": "Принятые и сброшенные соединения (counter, rate за 1m). Метрики:\n• `angie_connections_accepted` — принятые\n• `angie_connections_dropped` — сброшенные\nАналога handled/requests у angie нет — handled не экспортируется, requests учитываются в server_zones.",
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
@@ -304,7 +308,7 @@
           "refId": "T"
         }
       ],
-      "description": "Суммарные запросы server zone (rate) — аналог angie_http_server_zones_requests_total.",
+      "description": "Суммарные запросы server zone (counter, rate за 1m). Метрика: `nginx_server_requests{code=\"total\"}` — аналог `angie_http_server_zones_requests_total`. Агрегат host=* исключён.",
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
@@ -336,7 +340,7 @@
           "refId": "D"
         }
       ],
-      "description": "Серверная зона server_zone: всего запросов (rate), в обработке (gauge), отброшено (rate). processing/discarded у nginx-vts аналогов не имеют.",
+      "description": "Серверная зона server_zone. Метрики:\n• `angie_http_server_zones_requests_total` (counter, rate) — всего запросов\n• `angie_http_server_zones_requests_processing` (gauge) — в обработке\n• `angie_http_server_zones_requests_discarded` (counter, rate) — отброшено\nprocessing/discarded у nginx-vts аналогов не имеют.",
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
@@ -358,7 +362,7 @@
           "refId": "{"
         }
       ],
-      "description": "1xx/2xx/3xx/4xx/5xx по классам кодов. Агрегат host=* исключён.",
+      "description": "Ответы по классам кодов (counter, rate за 1m, by code). Метрика: `nginx_server_requests{code!=\"total\"}` — серии 1xx/2xx/3xx/4xx/5xx. Агрегат host=* исключён.",
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
@@ -380,7 +384,7 @@
           "refId": "{"
         }
       ],
-      "description": "Ответы по кодам (1xx/2xx/3xx/4xx/5xx) в server zone.",
+      "description": "Ответы по кодам в server zone (counter, rate за 1m, by code). Метрика: `angie_http_server_zones_responses` — серии 1xx/2xx/3xx/4xx/5xx.",
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
@@ -407,7 +411,7 @@
           "unit": "ms"
         }
       },
-      "description": "Среднее время обработки запроса на стороне сервера (requestMsec). Аналога у angie нет — angie не экспортирует per-request processing time в server zone.",
+      "description": "Среднее время обработки запроса на стороне сервера (ms). Метрика: `nginx_server_requestMsec` (gauge, avg по vhost). Аналога у angie нет — не экспортирует per-request processing time в server zone. Единица: ms.",
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
@@ -423,7 +427,7 @@
         "y": 57
       },
       "targets": [],
-      "description": "Заглушка: Angie не экспортирует среднее время обработки запроса в server zone (аналог nginx_server_requestMsec). Метрика отсутствует «из коробки». Панель оставлена для визуального параллелизма.",
+      "description": "Заглушка: Angie не экспортирует среднее время обработки запроса в server zone (аналог `nginx_server_requestMsec`). Метрика отсутствует «из коробки». Панель оставлена для визуального параллелизма.",
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
@@ -445,7 +449,7 @@
           "refId": "{"
         }
       ],
-      "description": "hit/miss/bypass/expired/revalidated/scarce/stale/updating. Агрегат host=* исключён.",
+      "description": "Статус кэша (counter, rate за 1m, by status). Метрика: `nginx_server_cache` — серии hit/miss/bypass/expired/revalidated/scarce/stale/updating. Агрегат host=* исключён.",
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
@@ -483,7 +487,7 @@
           "refId": "{"
         }
       ],
-      "description": "Ответы upstream по кодам (1xx/2xx/3xx/4xx/5xx).",
+      "description": "Ответы upstream по кодам (counter, rate за 1m, by code). Метрика: `nginx_upstream_requests` — серии 1xx/2xx/3xx/4xx/5xx.",
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
@@ -505,7 +509,7 @@
           "refId": "{"
         }
       ],
-      "description": "Ответы upstream peers по кодам.",
+      "description": "Ответы upstream peers по кодам (counter, rate за 1m, by code). Метрика: `angie_http_upstreams_peers_responses` — серии 1xx/2xx/3xx/4xx/5xx.",
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
@@ -532,7 +536,7 @@
           "unit": "Bps"
         }
       },
-      "description": "Байты upstream по направлению (in/out).",
+      "description": "Байты upstream по направлению (counter, rate за 1m, by direction). Метрика: `nginx_upstream_bytes` — серии in (от upstream) и out (к upstream). Единица: Bps.",
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
@@ -564,7 +568,7 @@
           "unit": "Bps"
         }
       },
-      "description": "Байты upstream peers: received (in) и sent (out).",
+      "description": "Байты upstream peers (counter, rate за 1m). Метрики:\n• `angie_http_upstreams_peers_data_received` — received (in)\n• `angie_http_upstreams_peers_data_sent` — sent (out)\nЕдиница: Bps.",
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
@@ -596,7 +600,7 @@
           "unit": "ms"
         }
       },
-      "description": "nginx_upstream_requestMsec (время запроса к upstream) и nginx_upstream_responseMsec (время ответа от upstream) — avg. Аналога у angie нет.",
+      "description": "Время запроса/ответа upstream (gauge, avg, ms). Метрики:\n• `nginx_upstream_requestMsec` — время запроса к upstream\n• `nginx_upstream_responseMsec` — время ответа от upstream\nАналога у angie нет. Единица: ms.",
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
@@ -618,7 +622,7 @@
           "refId": "{"
         }
       ],
-      "description": "Состояние peer'а upstream (gauge: 0=up, др. значения = недоступен). Аналога у nginx-vts нет.",
+      "description": "Состояние peer'а upstream (gauge, by peer). Метрика: `angie_http_upstreams_peers_state` — 0 = up, другие значения = недоступен. Аналога у nginx-vts нет.",
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
@@ -640,7 +644,7 @@
           "refId": "{"
         }
       ],
-      "description": "Использование shared-memory зоны ngx_http_vhost_traffic_status: usedsize и maxsize.",
+      "description": "Использование shared-memory зоны ngx_http_vhost_traffic_status (gauge, by memstat). Метрика: `nginx_server_sharedzones` — 2 серии:\n• usedsize — занято\n• maxsize — лимит зоны",
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
@@ -662,7 +666,7 @@
           "refId": "{"
         }
       ],
-      "description": "Текущее число keepalive-соединений к upstream. Аналога у nginx-vts нет.",
+      "description": "Текущее число keepalive-соединений к upstream (gauge, by upstream). Метрика: `angie_http_upstreams_keepalive`. Аналога у nginx-vts нет.",
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
@@ -710,7 +714,7 @@
           "refId": "D"
         }
       ],
-      "description": "fails/unavailable — counter (rate); downtime — gauge в секундах.",
+      "description": "Health upstream peers. Метрики:\n• `angie_http_upstreams_peers_health_fails` (counter, rate) — неудачи\n• `angie_http_upstreams_peers_health_unavailable` (counter, rate) — недоступность\n• `angie_http_upstreams_peers_health_downtime` (gauge, секунды) — суммарное время простоя",
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
@@ -753,7 +757,7 @@
           "refId": "T"
         }
       ],
-      "description": "current — gauge (текущие выбранные); total — counter (rate).",
+      "description": "Выбранные upstream peers. Метрики:\n• `angie_http_upstreams_peers_selected_current` (gauge) — текущие выбранные\n• `angie_http_upstreams_peers_selected_total` (counter, rate) — всего выбраний",
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
@@ -796,7 +800,7 @@
           "refId": "U"
         }
       ],
-      "description": "Shared-memory slab zones (upstream_backend): свободные/занятые страницы.",
+      "description": "Shared-memory slab зоны upstream_backend (gauge). Метрики:\n• `angie_slabs_pages_free` — свободные страницы\n• `angie_slabs_pages_used` — занятые страницы",
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
@@ -839,7 +843,7 @@
           "refId": "F"
         }
       ],
-      "description": "Слоты страниц по размеру: занятые и свободные.",
+      "description": "Слоты slab-страниц по размеру (gauge, by size). Метрики:\n• `angie_slabs_pages_slots_used` — занятые слоты\n• `angie_slabs_pages_slots_free` — свободные слоты",
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
@@ -882,7 +886,7 @@
           "refId": "F"
         }
       ],
-      "description": "Запросы и неудачи выделения слотов по размерам.",
+      "description": "Активность слотов slab-страниц по размеру (counter, rate за 1m, by size). Метрики:\n• `angie_slabs_pages_slots_reqs` — запросы выделения\n• `angie_slabs_pages_slots_fails` — неудачи выделения",
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
@@ -941,5 +945,5 @@
   },
   "uid": "nginx-vts-vs-angie-benchmark",
   "schemaVersion": 39,
-  "version": 5
+  "version": 6
 }
