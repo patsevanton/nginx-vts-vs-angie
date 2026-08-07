@@ -134,7 +134,7 @@ write_files:
       inputs = ["angie_access"]
       source = '''
       . = parse_json!(.message)
-      .instance = "angie"
+      .instance = "${instance_name}"
       .msg = join!([string(.request_method) ?? "-", string(.request_uri) ?? "-", string(.status) ?? "-"], " ")
       '''
 
@@ -142,7 +142,7 @@ write_files:
       type = "remap"
       inputs = ["angie_error"]
       source = '''
-      .instance = "angie"
+      .instance = "${instance_name}"
       if is_json(string!(.message)) {
           parsed, err = parse_json(.message)
           if err == null && is_object(parsed) { . = merge!(., parsed) }

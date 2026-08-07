@@ -1,7 +1,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: k6-${variant}
+  name: k6-${variant}-${section}
   namespace: ${namespace}
 spec:
   backoffLimit: 0
@@ -11,6 +11,8 @@ spec:
     metadata:
       labels:
         app: k6
+        variant: "${variant}"
+        section: "${section}"
     spec:
       restartPolicy: Never
       containers:
@@ -21,9 +23,11 @@ spec:
             - "--env"
             - "VARIANT=${variant}"
             - "--env"
-            - "TARGET_NGINX_VTS_DOCKER=${target_nginx_vts_docker}"
+            - "SECTION=${section}"
             - "--env"
-            - "TARGET_ANGIE=${target_angie}"
+            - "MAX_VUS=${max_vus}"
+            - "--env"
+            - "TARGET=${target}"
             - "/scripts/benchmark.js"
           volumeMounts:
             - name: k6-script

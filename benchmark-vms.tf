@@ -6,27 +6,70 @@ locals {
   # Внутренний IP первой ноды K8s (NodePort backend'ов слушает на всех нодах)
   node_addresses       = data.kubernetes_nodes.nodes.nodes[0].status[0].addresses
   k8s_node_internal_ip = [for a in local.node_addresses : a.address if a.type == "InternalIP"][0]
-  # Раздельные backend'ы для каждого прокси: 2 NodePort на vts, 2 NodePort на angie.
-  # Каждый прокси балансирует через upstream с 2 server'ами -> в метриках upstream видно 2 peer'а.
-  backend_addr_vts_1   = "${local.k8s_node_internal_ip}:${var.backend_nodeport_vts_1}"
-  backend_addr_vts_2   = "${local.k8s_node_internal_ip}:${var.backend_nodeport_vts_2}"
-  backend_addr_angie_1 = "${local.k8s_node_internal_ip}:${var.backend_nodeport_angie_1}"
-  backend_addr_angie_2 = "${local.k8s_node_internal_ip}:${var.backend_nodeport_angie_2}"
-  # Публичный адрес vlinsert для vector на VM. Берём из текущего IP балансировщика,
+
+  # Публичный адрес vlinsert для vector на VM. Берётся из текущего IP балансировщика,
   # чтобы при пересоздании IP Terraform'ом cloud-init всегда получал актуальный host.
-  vlinsert_addr        = "vlinsert.${yandex_vpc_address.addr.external_ipv4_address[0].address}.sslip.io:80"
+  vlinsert_addr = "vlinsert.${yandex_vpc_address.addr.external_ipv4_address[0].address}.sslip.io:80"
+
+  # 3 раздела бенчмарка: Low / Medium / High.
+  # Каждый раздел = 2 VM (nginx-vts + angie) + 2 backend'а (NodePort) + 1 k6-джоба на вариант.
+  # Все 6 VM поднимаются одновременно — разделы идут параллельно, без пересоздания VM.
+  # nodeport_base задаёт стартовый NodePort раздела (шаг 2): low=30085, medium=30087, high=30089.
+  #   - <base>     -> backend-<variant>-<section>-1
+  #   - <base>+1   -> backend-<variant>-<section>-2
+  benchmark_sections = {
+    low = {
+      max_vus    = 100
+      cores      = 2
+      memory     = 4
+      nodeport_1 = 30085
+      nodeport_2 = 30086
+    }
+    medium = {
+      max_vus    = 200
+      cores      = 4
+      memory     = 8
+      nodeport_1 = 30087
+      nodeport_2 = 30088
+    }
+    high = {
+      max_vus    = 300
+      cores      = 4
+      memory     = 8
+      nodeport_1 = 30089
+      nodeport_2 = 30090
+    }
+  }
+
+  # 6 VM: для каждого раздела — по 2 (nginx-vts + angie).
+  # variant nginx-vts использует docker-compose cloud-init, variant angie — deb-пакет.
+  # key имеет вид "<variant>-<section>" (например "nginx-vts-low") — это имя ресурса и hostname VM.
+  benchmark_vms = {
+    for sv in setproduct(["nginx-vts", "angie"], keys(local.benchmark_sections)) :
+    "${sv[0]}-${sv[1]}" => {
+      variant    = sv[0]
+      section    = sv[1]
+      cores      = local.benchmark_sections[sv[1]].cores
+      memory     = local.benchmark_sections[sv[1]].memory
+      max_vus    = local.benchmark_sections[sv[1]].max_vus
+      nodeport_1 = local.benchmark_sections[sv[1]].nodeport_1
+      nodeport_2 = local.benchmark_sections[sv[1]].nodeport_2
+    }
+  }
 }
 
-resource "yandex_compute_instance" "nginx-vts-docker" {
-  name                      = "nginx-vts-docker"
+resource "yandex_compute_instance" "benchmark_vm" {
+  for_each = local.benchmark_vms
+
+  name                      = each.key
   platform_id               = "standard-v2"
   network_acceleration_type = "software_accelerated"
   allow_stopping_for_update = true
   zone                      = yandex_vpc_subnet.nginx-vts-vs-angie-a.zone
 
   resources {
-    cores  = 4
-    memory = 8
+    cores  = each.value.cores
+    memory = each.value.memory
   }
 
   scheduling_policy {
@@ -47,63 +90,40 @@ resource "yandex_compute_instance" "nginx-vts-docker" {
   }
 
   metadata = {
-    ssh-keys  = "ubuntu:${file("~/.ssh/id_ed25519.pub")}"
-    user-data = templatefile("${path.module}/benchmark/cloud-init/nginx-vts-docker.yaml", {
-      backend_addr_1 = local.backend_addr_vts_1
-      backend_addr_2 = local.backend_addr_vts_2
-      vlinsert_addr  = local.vlinsert_addr
-    })
-  }
-}
-
-resource "yandex_compute_instance" "angie" {
-  name                      = "angie"
-  platform_id               = "standard-v2"
-  network_acceleration_type = "software_accelerated"
-  allow_stopping_for_update = true
-  zone                      = yandex_vpc_subnet.nginx-vts-vs-angie-a.zone
-
-  resources {
-    cores  = 4
-    memory = 8
-  }
-
-  scheduling_policy {
-    preemptible = true
-  }
-
-  boot_disk {
-    initialize_params {
-      image_id = "fd806c8slu9j1pa87msc"
-      size     = 30
-      type     = "network-ssd"
-    }
-  }
-
-  network_interface {
-    subnet_id = yandex_vpc_subnet.nginx-vts-vs-angie-a.id
-    nat       = true
-  }
-
-  metadata = {
-    ssh-keys  = "ubuntu:${file("~/.ssh/id_ed25519.pub")}"
-    user-data = templatefile("${path.module}/benchmark/cloud-init/angie.yaml", {
-      backend_addr_1 = local.backend_addr_angie_1
-      backend_addr_2 = local.backend_addr_angie_2
-      vlinsert_addr  = local.vlinsert_addr
-    })
+    ssh-keys = "ubuntu:${file("~/.ssh/id_ed25519.pub")}"
+    user-data = templatefile(
+      each.value.variant == "nginx-vts"
+      ? "${path.module}/benchmark/cloud-init/nginx-vts-docker.yaml"
+      : "${path.module}/benchmark/cloud-init/angie.yaml",
+      {
+        instance_name  = each.key
+        backend_addr_1 = "${local.k8s_node_internal_ip}:${each.value.nodeport_1}"
+        backend_addr_2 = "${local.k8s_node_internal_ip}:${each.value.nodeport_2}"
+        vlinsert_addr  = local.vlinsert_addr
+      }
+    )
   }
 }
 
 output "vm_nginx_vts_docker_ip" {
-  value = yandex_compute_instance.nginx-vts-docker.network_interface.0.nat_ip_address
+  description = "Публичный IP VM nginx-vts-high (для обратной совместимости со старыми командами)"
+  value       = yandex_compute_instance.benchmark_vm["nginx-vts-high"].network_interface.0.nat_ip_address
 }
 
 output "vm_angie_ip" {
-  value = yandex_compute_instance.angie.network_interface.0.nat_ip_address
+  description = "Публичный IP VM angie-high (для обратной совместимости со старыми командами)"
+  value       = yandex_compute_instance.benchmark_vm["angie-high"].network_interface.0.nat_ip_address
+}
+
+output "vm_all_ips" {
+  description = "Публичные IP всех 6 VM по ключу <variant>-<section>"
+  value = {
+    for k, v in yandex_compute_instance.benchmark_vm :
+    k => v.network_interface.0.nat_ip_address
+  }
 }
 
 output "angie_console_url" {
-  value       = "http://angie-console.${yandex_compute_instance.angie.network_interface.0.nat_ip_address}.sslip.io/console/"
-  description = "Angie Console Light (Web UI мониторинга Angie, домен через sslip.io из публичного IP VM Angie)"
+  value       = "http://angie-console.${yandex_compute_instance.benchmark_vm["angie-high"].network_interface.0.nat_ip_address}.sslip.io/console/"
+  description = "Angie Console Light (Web UI мониторинга Angie high-раздела, домен через sslip.io из публичного IP VM Angie)"
 }

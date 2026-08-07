@@ -5,13 +5,18 @@ locals {
     namespace = local.benchmark_namespace
   })
 
-  # 4 отдельных бэкенда: 2 для nginx-vts, 2 для angie.
-  # Каждый бэкенд — собственный Deployment + Service (NodePort), params: name, node_port.
+  # 12 backend'ов: по 2 на каждую из 6 VM.
+  # Имя: backend-<variant>-<section>-<n>, NodePort из benchmark_sections[section].
+  # Каждый backend — Deployment + Service (NodePort) из шаблона backend.yaml.tftpl.
   benchmark_backends = {
-    "backend-vts-1"   = var.backend_nodeport_vts_1
-    "backend-vts-2"   = var.backend_nodeport_vts_2
-    "backend-angie-1" = var.backend_nodeport_angie_1
-    "backend-angie-2" = var.backend_nodeport_angie_2
+    for sv_n in flatten([
+      for section, cfg in local.benchmark_sections : [
+        for variant in ["nginx-vts", "angie"] : [
+          { name = "backend-${variant}-${section}-1", node_port = cfg.nodeport_1 },
+          { name = "backend-${variant}-${section}-2", node_port = cfg.nodeport_2 },
+        ]
+      ]
+    ]) : sv_n.name => sv_n.node_port
   }
 
   benchmark_backend_configs = {
@@ -28,10 +33,15 @@ locals {
     benchmark_js = file("${path.module}/benchmark/k6/benchmark.js")
   })
 
+  # k6-env ConfigMap: 6 ключей TARGET_<VARIANT>_<SECTION> (верхний регистр, - на _) -> IP VM.
+  benchmark_k6_targets = {
+    for k, v in yandex_compute_instance.benchmark_vm :
+    upper(replace(k, "-", "_")) => v.network_interface.0.nat_ip_address
+  }
+
   benchmark_k6_env_config = templatefile("${path.module}/benchmark/templates/k6-env-configmap.yaml.tftpl", {
-    namespace                = local.benchmark_namespace
-    target_nginx_vts_docker  = yandex_compute_instance.nginx-vts-docker.network_interface.0.nat_ip_address
-    target_angie             = yandex_compute_instance.angie.network_interface.0.nat_ip_address
+    namespace = local.benchmark_namespace
+    targets   = local.benchmark_k6_targets
   })
 }
 
@@ -64,6 +74,6 @@ resource "local_file" "benchmark_k6_env" {
 output "kubectl_apply_benchmark_command" {
   value = <<-EOT
     kubectl apply -f ${local_file.benchmark_namespace.filename}
-    kubectl apply -f ${local_file.benchmark_backends["backend-vts-1"].filename} -f ${local_file.benchmark_backends["backend-vts-2"].filename} -f ${local_file.benchmark_backends["backend-angie-1"].filename} -f ${local_file.benchmark_backends["backend-angie-2"].filename} -f ${local_file.benchmark_k6_script.filename} -f ${local_file.benchmark_k6_env.filename}
+    kubectl apply -f ${join(" -f ", [for k, v in local.benchmark_backend_configs : local_file.benchmark_backends[k].filename])} -f ${local_file.benchmark_k6_script.filename} -f ${local_file.benchmark_k6_env.filename}
   EOT
 }

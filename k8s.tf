@@ -59,7 +59,7 @@ resource "yandex_kubernetes_node_group" "k8s-node-group" {
   }
 
   instance_template {
-    platform_id = "standard-v2"
+    platform_id               = "standard-v2"
     network_acceleration_type = "software_accelerated"
     scheduling_policy {
       preemptible = true
@@ -92,10 +92,10 @@ locals {
   })
 
   victoriametrics_values = templatefile("${path.module}/values/victoriametrics-values.yaml.tftpl", {
-    nginx_vts_docker_ip = yandex_compute_instance.nginx-vts-docker.network_interface.0.nat_ip_address
-    angie_ip            = yandex_compute_instance.angie.network_interface.0.nat_ip_address
-    lb_ip               = yandex_vpc_address.addr.external_ipv4_address[0].address
-    path_module         = path.module
+    # IP всех 6 VM, разделённые по варианту: vm_ips (nginx-vts-*), angie_ips (angie-*)
+    vm_ips    = { for k, v in yandex_compute_instance.benchmark_vm : k => v.network_interface.0.nat_ip_address if startswith(k, "nginx-vts-") }
+    angie_ips = { for k, v in yandex_compute_instance.benchmark_vm : k => v.network_interface.0.nat_ip_address if startswith(k, "angie-") }
+    lb_ip     = yandex_vpc_address.addr.external_ipv4_address[0].address
   })
 
   victoria_logs_cluster_values = templatefile("${path.module}/values/victoria-logs-cluster-values.yaml.tftpl", {
@@ -188,8 +188,8 @@ output "grafana_admin_password_command" {
 
 locals {
   benchmark_dashboard_configmap = templatefile("${path.module}/benchmark/templates/benchmark-dashboard-configmap.yaml.tftpl", {
-    namespace       = "vmks"
-    dashboard_json  = file("${path.module}/benchmark/grafana/benchmark-dashboard.json")
+    namespace      = "vmks"
+    dashboard_json = file("${path.module}/benchmark/grafana/benchmark-dashboard.json")
   })
 }
 

@@ -4,16 +4,19 @@ Operational notes for working with this repo's infrastructure (Yandex Cloud + K8
 
 ## Потеря ephemeral NAT IP при stop/start VM
 
-Обе VM (`nginx-vts-docker`, `angie`) используют **ephemeral** NAT IP (`network_interface.nat = true` без явного `nat_ip_address`). При любом изменении ресурсов/платформы/ускоренной сети Terraform останавливает VM (`allow_stopping_for_update = true` в `benchmark-vms.tf` — обязательно для in-place обновления), а Yandex Compute **освобождает ephemeral NAT IP** на stop и не привязывает его обратно на start. Симптом: VM `RUNNING` с внутренним IP, но `nat_ip_address: None`, SSH/HTTP по старому публичному IP не отвечают, `terraform output` всё ещё показывает устаревший адрес.
+Все 6 VM (`nginx-vts-<section>`, `angie-<section>` для section=low/medium/high) используют **ephemeral** NAT IP (`network_interface.nat = true` без явного `nat_ip_address`). При любом изменении ресурсов/платформы/ускоренной сети Terraform останавливает VM (`allow_stopping_for_update = true` в `benchmark-vms.tf` — обязательно для in-place обновления), а Yandex Compute **освобождает ephemeral NAT IP** на stop и не привязывает его обратно на start. Симптом: VM `RUNNING` с внутренним IP, но `nat_ip_address: None`, SSH/HTTP по старому публичному IP не отвечают, `terraform output` всё ещё показывает устаревший адрес.
 
 ### Восстановление
 
 ```bash
-# 1. taint-нуть обе VM, чтобы Terraform пересоздал их с новым ephemeral NAT IP
-terraform taint yandex_compute_instance.angie
-terraform taint yandex_compute_instance.nginx-vts-docker
+# 1. taint-нуть нужные VM, чтобы Terraform пересоздал их с новым ephemeral NAT IP
+#    (6 VM: yandex_compute_instance.benchmark_vm["nginx-vts-<section>"], ["angie-<section>"])
+#    Пример для всех 6:
+for vm in nginx-vts-low angie-low nginx-vts-medium angie-medium nginx-vts-high angie-high; do
+  terraform taint 'yandex_compute_instance.benchmark_vm["'$vm'"]'
+done
 terraform apply -auto-approve
-# новые IP появятся в terraform output vm_angie_ip / vm_nginx_vts_docker_ip
+# новые IP появятся в terraform output vm_all_ips (и vm_nginx_vts_docker_ip/vm_angie_ip для high-раздела)
 
 # 2. перегенерированные манифесты применить в K8s (k6-env ConfigMap с новыми target IP)
 kubectl apply -f ./benchmark/manifests/k6-env-configmap.yaml
@@ -42,16 +45,15 @@ yc managed-kubernetes cluster get-credentials --id $(terraform output -raw k8s_c
 kubectl get nodes
 yc managed-kubernetes node-group get <node-group-id> | rg -i "accel|preempt|cores|memory|platform"
 
-# VM сервисы (health-check)
-NGINX_VTS_IP=$(terraform output -raw vm_nginx_vts_docker_ip)
-ANGIE_IP=$(terraform output -raw vm_angie_ip)
-for name_ip in "nginx-vts-docker:$NGINX_VTS_IP" "angie:$ANGIE_IP"; do
+# VM сервисы (health-check всех 6 VM)
+for name_ip in $(terraform output -json vm_all_ips | jq -r 'to_entries[] | "\(.key):\(.value)"'); do
   name="${name_ip%%:*}"; ip="${name_ip##*:}"
+  variant="${name%%-*}"
   echo "=== $name ($ip) ==="
   echo -n "  HTTP: "; curl -s -m 10 -o /dev/null -w "%{http_code}\n" "http://$ip/"
   echo -n "  Vector: "; curl -s -m 10 -o /dev/null -w "%{http_code}\n" "http://$ip:9598/metrics"
-  case "$name" in
-    nginx-vts-docker)
+  case "$variant" in
+    nginx-vts)
       echo -n "  Metrics: "; curl -s -m 10 -o /dev/null -w "%{http_code}\n" "http://$ip:9913/metrics"
       echo -n "  Status: "; curl -s -m 10 -o /dev/null -w "%{http_code}\n" "http://$ip/status"
       ;;

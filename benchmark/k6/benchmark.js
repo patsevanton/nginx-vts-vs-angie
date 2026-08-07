@@ -8,21 +8,19 @@ const latencyP99 = new Trend('latency_p99');
 const ttfbP95 = new Trend('ttfb_p95');
 const throughputBytes = new Trend('throughput_bytes');
 
-const TARGETS = {
-  'nginx-vts-docker': __ENV.TARGET_NGINX_VTS_DOCKER || 'localhost',
-  'angie': __ENV.TARGET_ANGIE || 'localhost',
-};
-
 const VARIANT = __ENV.VARIANT || 'nginx-vts-docker';
-const TARGET_HOST = TARGETS[VARIANT];
+const SECTION = __ENV.SECTION || 'high';
+const TARGET_HOST = __ENV.TARGET || 'localhost';
 const BASE_URL = `http://${TARGET_HOST}`;
 
-// Host-заголовок зависит от варианта -> у каждого прокси свой vhost в метриках
-// (nginx-vts: host="nginx-vts.benchmark.local", angie: zone="angie.benchmark.local")
+const MAX_VUS = parseInt(__ENV.MAX_VUS || '300', 10);
+const STAGE_HOLD = parseInt(__ENV.STAGE_HOLD || '120', 10);
+const MID_VUS = Math.round(MAX_VUS * 0.5);
+
 const VHOST = {
-  'nginx-vts-docker': 'nginx-vts.benchmark.local',
+  'nginx-vts': 'nginx-vts.benchmark.local',
   'angie': 'angie.benchmark.local',
-}[VARIANT];
+}[VARIANT] || `${VARIANT}.benchmark.local`;
 
 export const options = {
   scenarios: {
@@ -31,22 +29,22 @@ export const options = {
       vus: 10,
       duration: '30s',
       startTime: '0s',
-      tags: { phase: 'warmup' },
+      tags: { phase: 'warmup', section: SECTION, variant: VARIANT },
     },
     load: {
       executor: 'ramping-vus',
       startVUs: 0,
       stages: [
         { duration: '30s', target: 50 },
-        { duration: '120s', target: 50 },
-        { duration: '30s', target: 100 },
-        { duration: '120s', target: 100 },
-        { duration: '30s', target: 300 },
-        { duration: '120s', target: 300 },
+        { duration: `${STAGE_HOLD}s`, target: 50 },
+        { duration: '30s', target: MID_VUS },
+        { duration: `${STAGE_HOLD}s`, target: MID_VUS },
+        { duration: '30s', target: MAX_VUS },
+        { duration: `${STAGE_HOLD}s`, target: MAX_VUS },
         { duration: '30s', target: 0 },
       ],
       startTime: '30s',
-      tags: { phase: 'load' },
+      tags: { phase: 'load', section: SECTION, variant: VARIANT },
     },
   },
   thresholds: {
@@ -75,9 +73,10 @@ export default function () {
 }
 
 export function handleSummary(data) {
-  const variant = VARIANT;
   const summary = {
-    variant: variant,
+    variant: VARIANT,
+    section: SECTION,
+    max_vus: MAX_VUS,
     timestamp: new Date().toISOString(),
     metrics: {
       http_reqs: data.metrics.http_reqs ? data.metrics.http_reqs.values.count : 0,
@@ -96,7 +95,7 @@ export function handleSummary(data) {
     },
   };
 
-  const resultFile = `/tmp/k6-summary-${variant}.json`;
+  const resultFile = `/tmp/k6-summary-${VARIANT}-${SECTION}.json`;
 
   return {
     stdout: JSON.stringify(summary, null, 2),
