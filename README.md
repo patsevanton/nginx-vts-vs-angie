@@ -279,11 +279,11 @@ terraform output grafana_admin_password_command    # команда для по�
 
 ### Готовый дашборд в Grafana
 
-Дашборд **«Nginx-VTS vs Angie Benchmark»** (35 панелей + 1 row-разделитель) применяется в Grafana через ConfigMap `benchmark-dashboard` (namespace `vmks`, лейбл `grafana_dashboard: "1"`, файл `benchmark/manifests/benchmark-dashboard-configmap.yaml`), который подхватывает sidecar `grafana-sc-dashboard` чарта `vmks`. Файл манифеста генерируется Terraform из шаблона `benchmark/templates/benchmark-dashboard-configmap.yaml.tftpl`; команда применения выводится в `terraform output kubectl_apply_dashboard_command` и продублирована на шаге 3. Ручной импорт через JSON не требуется.
+Дашборд **«Nginx-VTS vs Angie Benchmark»** (33 панели + 1 row-разделитель) применяется в Grafana через ConfigMap `benchmark-dashboard` (namespace `vmks`, лейбл `grafana_dashboard: "1"`, файл `benchmark/manifests/benchmark-dashboard-configmap.yaml`), который подхватывает sidecar `grafana-sc-dashboard` чарта `vmks`. Файл манифеста генерируется Terraform из шаблона `benchmark/templates/benchmark-dashboard-configmap.yaml.tftpl`; команда применения выводится в `terraform output kubectl_apply_dashboard_command` и продублирована на шаге 3. Ручной импорт через JSON не требуется.
 
 Дашборд разбит на две секции:
 
-1. **Сравнение (5 сводных панелей)** — RPS по вариантам, входящий/исходящий трафик, Vector Processed Events (events/s), Vector Sent Bytes (bytes/s в VictoriaLogs). Парные запросы nginx-vts и angie на одной панели для сопоставления.
+1. **Сравнение (3 сводные панели)** — RPS по вариантам, входящий трафик (Bytes Received), исходящий трафик (Bytes Sent). Парные запросы nginx-vts и angie на одной панели для сопоставления.
 2. **Парные метрики nginx-vts (слева) vs angie (справа) (1 row + 30 парных панелей = 15 пар)** — один общий row, в котором похожие метрики размещены рядом: nginx-vts всегда в левой колонке (`x: 0`), angie — в правой (`x: 12`), пары идут друг за другом по вертикали по темам: Connection states → Accepted/Handled → Server zone requests → HTTP responses by code → Server requestMsec → Cache status → Upstream responses by code → Upstream bytes → Upstream time/peer state → Shared zones/keepalive → Upstream health/selected → Slabs. Метрики без аналога (cache, upstream requestMsec — у nginx-vts; upstream keepalive/peer state/health/selected, slabs — у angie) помещены в тот же тематический row на свободной позиции с заголовком «(нет аналога …)» и пустым списком targets — для визуального параллелизма.
 
 Дашборд использует метрики, которые scrape'ит vmagent (см. `values/victoriametrics-values.yaml.tftpl`, секция `extraObjects` → `vmks-additional-scrape-configs`):

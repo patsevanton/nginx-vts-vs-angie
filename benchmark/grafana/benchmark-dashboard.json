@@ -99,67 +99,13 @@
       "description": "Исходящий трафик (байты/с, отправленные сервером клиентам). Метрики:\n• nginx-vts: `nginx_server_bytes{direction=\"out\"}` (counter, rate за 1m).\n• angie: `angie_http_server_zones_data_sent` (counter, rate за 1m).\nЕдиница: Bps."
     },
     {
-      "title": "Сравнение: Vector Processed Events (events/s)",
-      "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 8
-      },
-      "targets": [
-        {
-          "expr": "sum by (variant) (rate(vector_component_received_events_total{variant=~\"$variant\"}[1m]))",
-          "legendFormat": "{{variant}} events/s",
-          "refId": "E"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ops"
-        }
-      },
-      "description": "События, обработанные vector (events/s), по variant. Метрика: `vector_component_received_events_total` (counter, rate за 1m). Единица: ops.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      }
-    },
-    {
-      "title": "Сравнение: Vector Sent Bytes (to VictoriaLogs)",
-      "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 16
-      },
-      "targets": [
-        {
-          "expr": "sum by (variant) (rate(vector_component_sent_bytes_total{variant=~\"$variant\"}[1m]))",
-          "legendFormat": "{{variant}} bytes/s",
-          "refId": "B"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "Bps"
-        }
-      },
-      "description": "Байты, отправленные vector в VictoriaLogs (bytes/s), по variant. Метрика: `vector_component_sent_bytes_total` (counter, rate за 1m). Единица: Bps.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      }
-    },
-    {
       "title": "Парные метрики nginx-vts (слева) vs angie (справа)",
       "type": "row",
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 24
+        "y": 16
       },
       "collapsed": false,
       "panels": [],
