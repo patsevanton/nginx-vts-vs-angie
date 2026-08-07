@@ -2,9 +2,9 @@
 
 Инфраструктура как код (Terraform) и методика объективного сравнения двух популярных веб-прокси: **nginx с модулем VTS** (nginx-module-vts + nginx-vts-exporter) и **Angie** (форк nginx от «Веб-Сервера» с нативной поддержкой метрик Prometheus). Бенчмарк полностью воспроизводим: от развёртывания VM и Kubernetes-кластера до Grafana-дашборда с результатами.
 
-> **Требование к версии Kubernetes:** бенчмарк проверен на **Managed Kubernetes 1.33** (release channel `STABLE`). В `k8s.tf` версия жёстко задана как `1.33` и для master, и для node group. Yandex Managed Kubernetes также поддерживает 1.32/1.34/1.35 (канал `RAPID`/`REGULAR`) — если хотите другую версию, измените `version` в `k8s.tf` (две позиции: `master.version` и `yandex_kubernetes_node_group.k8s-node-group.version`). На 1.32 и младше Helm-чарт `victoria-metrics-k8s-stack 0.87.0` может требовать более старых API-версий CRD.
+> **Требование к версии Kubernetes:** бенчмарк проверен на **Managed Kubernetes 1.33** (release channel `STABLE`). В `k8s.tf` версия жёстко задана как `1.33` и для master, и для node group. Yandex Managed Kubernetes также поддерживает 1.32/1.34/1.35 (канал `RAPID`/`REGULAR`) — если хотите другую версию, измените `version` в `k8s.tf` (две позиции: `master.version` и `yandex_kubernetes_node_group.k8s-node-group.version`). На 1.32 и младше Helm-чарт `victoria-metrics-k8s-stack 0.88.0` может требовать более старых API-версий CRD.
 >
-> **Требование к версии чарта VictoriaMetrics:** `victoria-metrics-k8s-stack 0.87.0` содержит баг `config-reloader` на K8s 1.33 — VMAgent не перечитывает Secret со скрейп-конфигом при пересоздании VM/смене IP, скрейпы идут на устаревшие адреса (см. <https://github.com/VictoriaMetrics/helm-charts/issues/3136>, status: `waiting for release`). После выхода исправления в upstream обновить `--version` в `README.md` (шаг 3) и `k8s.tf` (если задано) до версии, закрывающей issue #3136. До тех пор использовать workaround: `kubectl rollout restart deployment vmagent-vm-stack -n vmks` после смены IP VM.
+> **Требование к версии чарта VictoriaMetrics:** используется `victoria-metrics-k8s-stack 0.88.0` — баг `config-reloader` на K8s 1.33 (VMAgent не перечитывал Secret со скрейп-конфигом при пересоздании VM/смене IP, скрейпы шли на устаревшие адреса, см. <https://github.com/VictoriaMetrics/helm-charts/issues/3136>) исправлен в этой версии. На более старых версиях чарта (0.87.0 и младше) использовать workaround: `kubectl rollout restart deployment vmagent-vm-stack -n vmks` после смены IP VM.
 
 ## Ключевые результаты
 
@@ -159,19 +159,15 @@ helm repo update
 # VictoriaMetrics (k8s-stack: vmoperator, vmagent, vmselect, vminsert, Grafana)
 helm upgrade --install vmks \
   victoriametrics/victoria-metrics-k8s-stack \
-  --version 0.87.0 \
+  --version 0.88.0 \
   --namespace vmks --create-namespace \
   -f ./values/victoriametrics-values.yaml
 
-# ВНИМАНИЕ: версия victoria-metrics-k8s-stack 0.87.0 содержит баг config-reloader'а VMAgent
-# на Kubernetes 1.33 — config-reloader не может перечитать Secret с конфигом скрейпов
-# (ошибка "cannot list resource secrets", VMAgent бегает со устаревшим конфигом и не подхватывает
-# новые VMServiceScrape targets при пересоздании VM / смене IP). См.
-# https://github.com/VictoriaMetrics/helm-charts/issues/3136 (waiting for release).
-# Workaround: после изменения IP VM перезапускать под vmagent (kubectl rollout restart
-# deployment vmagent-vm-stack -n vmks) — Secret обновляется оператором, но без рестарта
-# config-reloader его не перечитывает. Требуется: после выхода исправления обновить чарт
-# до версии, где issue #3136 закрыт (помечено "waiting for release" в upstream).
+# Версия victoria-metrics-k8s-stack 0.88.0 содержит исправление бага config-reloader'а
+# VMAgent на Kubernetes 1.33 (issue https://github.com/VictoriaMetrics/helm-charts/issues/3136):
+# ранее config-reloader не перечитывал Secret с конфигом скрейпов при пересоздании VM / смене IP,
+# и без kubectl rollout restart deployment vmagent-vm-stack -n vmks скрейпы шли на устаревшие
+# адреса. Начиная с 0.88.0 workaround не требуется.
 
 # VictoriaLogs cluster
 helm upgrade --install vlcluster \

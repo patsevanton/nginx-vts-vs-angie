@@ -19,20 +19,20 @@ terraform apply -auto-approve
 kubectl apply -f ./benchmark/manifests/k6-env-configmap.yaml
 
 # 3. перегенерированный vmagent scrape config (values/victoriametrics-values.yaml) — helm upgrade vmks
-helm upgrade vmks victoriametrics/victoria-metrics-k8s-stack --version 0.87.0 --namespace vmks \
+helm upgrade vmks victoriametrics/victoria-metrics-k8s-stack --version 0.88.0 --namespace vmks \
   -f ./values/victoriametrics-values.yaml
 
-# 4. workaround бага #3136 (см. README шаг 3): рестарт vmagent, иначе config-reloader не перечитает Secret
-kubectl rollout restart deployment vmagent-vm-stack -n vmks
+# 4. рестарт vmagent (только для чартов <=0.87.0, где не закрыт issue #3136; на 0.88.0+ не требуется)
+kubectl rollout restart deployment vmagent-vm-stack -n vmks 2>/dev/null || true
 ```
 
 > Для production имеет смысл привязать статический IP (`yandex_vpc_address` + `nat_ip_address` в `network_interface`), чтобы переживать stop/start без смены адресов. В этом бенчмарке ephemeral IP допустим, т.к. IP используется только на время замера, а все зависимые ресурсы (k6-env ConfigMap, vmagent scrape targets) перегенерируются Terraform'ом и применяются одной командой.
 
 ## Баг vmagent config-reloader (#3136)
 
-`victoria-metrics-k8s-stack 0.87.0` на K8s 1.33: VMAgent не перечитывает Secret со скрейп-конфигом при пересоздании VM/смене IP, скрейпы идут на устаревшие адреса. Upstream: https://github.com/VictoriaMetrics/helm-charts/issues/3136 (status: `waiting for release`).
+`victoria-metrics-k8s-stack 0.87.0` на K8s 1.33: VMAgent не перечитывает Secret со скрейп-конфигом при пересоздании VM/смене IP, скрейпы идут на устаревшие адреса. Upstream: https://github.com/VictoriaMetrics/helm-charts/issues/3136 (status: `closed`, исправлен в `victoria-metrics-k8s-stack 0.88.0`).
 
-Workaround: `kubectl rollout restart deployment vmagent-vm-stack -n vmks` после смены IP VM / `helm upgrade vmks`. После выхода исправления обновить `--version` в `README.md` (шаг 3) и `k8s.tf` (если задано) до версии, закрывающей issue #3136.
+Workaround для чартов <=0.87.0: `kubectl rollout restart deployment vmagent-vm-stack -n vmks` после смены IP VM / `helm upgrade vmks`. На `0.88.0+` workaround не требуется — config-reloader корректно перечитывает Secret. Версия в README (шаг 3) и командах recovery выше уже обновлены до `0.88.0`.
 
 ## Команды проверки (после любых изменений инфраструктуры)
 
