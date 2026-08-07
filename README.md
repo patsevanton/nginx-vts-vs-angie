@@ -8,15 +8,49 @@
 
 ## Ключевые результаты
 
+Бенчмарк разбит на **3 раздела** по уровню нагрузки и ресурсов VM. В каждом разделе ресурсы VM nginx-vts-docker и angie **одинаковые** — чтобы сравнивать прокси, а не железо. k6-сценарий один и тот же (warmup 10 VU × 30с + ramp 0→50→…→MAX_VUS→0 за 8м), меняется только пиковое значение VU (`MAX_VUS`).
+
+| Раздел | MAX_VUS | Ресурсы VM (cores/RAM) | Сеть | Ожидаемое RPS |
+|---|---|---|---|---|
+| **Low**    | 100 | 2 c / 4 ГБ | standard              | ~1500–2000 |
+| **Medium** | 200 | 4 c / 8 ГБ | standard              | ~3000–4000 |
+| **High**   | 300 | 4 c / 8 ГБ | software-accelerated  | ~4500–5500 |
+
+> Конфигурация ресурсов и сети задаётся в `benchmark-vms.tf` (`resources`, `network_acceleration_type`), пиковое VU — через env `MAX_VUS` в `benchmark/templates/k6-job.yaml.tftpl`. Перед каждым разделом: `terraform apply` (обновить ресурсы VM) → дождаться cloud-init → health-check VM → запустить k6 jobs → собрать результаты. Подробная процедура — в шаге 5.
+
+### Раздел 1: Low (100 VU, 2 c / 4 ГБ, standard network)
+
 | Метрика | nginx-vts-docker | Angie |
 |---------|------------------|-------|
-| Всего запросов (за 8м30с) | 1 048 115 | **1 090 288** |
-| Средняя latency | 52.0 ms | **49.5 ms** |
-| p95 latency | 193.7 ms | **185.4 ms** |
-| Ошибки (rate) | 0.000006% | 0% |
+| Всего запросов | _заполнить после прогона_ | _заполнить_ |
+| Средняя latency | _заполнить_ | _заполнить_ |
+| p95 latency | _заполнить_ | _заполнить_ |
+| Ошибки (rate) | _заполнить_ | _заполнить_ |
+| Макс. VU | 100 | 100 |
+
+### Раздел 2: Medium (200 VU, 4 c / 8 ГБ, standard network)
+
+| Метрика | nginx-vts-docker | Angie |
+|---------|------------------|-------|
+| Всего запросов | _заполнить_ | _заполнить_ |
+| Средняя latency | _заполнить_ | _заполнить_ |
+| p95 latency | _заполнить_ | _заполнить_ |
+| Ошибки (rate) | _заполнить_ | _заполнить_ |
+| Макс. VU | 200 | 200 |
+
+### Раздел 3: High (300 VU, 4 c / 8 ГБ, software-accelerated network)
+
+| Метрика | nginx-vts-docker | Angie |
+|---------|------------------|-------|
+| Всего запросов | _заполнить_ | _заполнить_ |
+| Средняя latency | _заполнить_ | _заполнить_ |
+| p95 latency | _заполнить_ | _заполнить_ |
+| Ошибки (rate) | _заполнить_ | _заполнить_ |
 | Макс. VU | 300 | 300 |
 
-Вывод: при пиковой нагрузке до 300 виртуальных пользователей оба прокси показывают сопоставимую производительность. Angie обработал на ~4% больше запросов с чуть меньшей latency и без единичной ошибки, тогда как у nginx-vts зафиксирован один выброс max latency ~16с (на пике 300 VU) при p95 в норме. nginx-vts потребовал сборки стороннего модуля и экспортера, тогда как Angie предоставил все метрики «из коробки».
+### Вывод
+
+_Сформулируется после прогонов всех 3 разделов — сравнение динамики RPS/latency/ошибок при росте нагрузки и ресурсов для обоих прокси._
 
 ## Архитектура
 
@@ -204,11 +238,56 @@ kubectl apply -f benchmark/manifests/backend-vts-1.yaml -f benchmark/manifests/b
 
 ### 5. Запуск бенчмарка
 
+Бенчмарк состоит из **3 разделов** (Low / Medium / High — см. «Ключевые результаты»). Каждый раздел запускается отдельно: сначала меняются ресурсы VM через Terraform, дожидаются cloud-init, проверяются сервисы, затем запускаются k6 jobs. Результаты каждого раздела заносятся в таблицу «Ключевые результаты».
+
+#### Подготовка раздела (общая процедура для каждого из 3 разделов)
+
+1. Задать ресурсы VM и сеть в `benchmark-vms.tf` согласно таблице раздела (Low: 2 c / 4 ГБ / standard; Medium: 4 c / 8 ГБ / standard; High: 4 c / 8 ГБ / software-accelerated).
+2. Задать `MAX_VUS` (100 / 200 / 300) в `benchmark/templates/k6-job.yaml.tftpl` (env `MAX_VUS`).
+3. Применить изменения и дождаться поднятия сервисов:
+
 ```bash
-# Оба варианта параллельно
+# Обновить ресурсы VM (Terraform остановит/запустит VM — см. AGENTS.md про потерю NAT IP)
+terraform apply -auto-approve
+
+# Если сменился публичный IP VM (ephemeral NAT): taint + re-apply (см. AGENTS.md)
+# Затем обновить k6-env ConfigMap и vmagent scrape config с новыми IP:
+kubectl apply -f ./benchmark/manifests/k6-env-configmap.yaml
+helm upgrade vmks victoriametrics/victoria-metrics-k8s-stack --version 0.88.0 --namespace vmks \
+  -f ./values/victoriametrics-values.yaml
+kubectl rollout restart deployment vmagent-vm-stack -n vmks 2>/dev/null || true
+
+# Дождаться завершения cloud-init на VM (особенно nginx-vts-docker: docker build ~2-3 мин)
+# Проверить health сервисов на VM — все должны ответить 200 (HTTP / может быть 404, т.к. root location не настроен):
+for name_ip in "nginx-vts-docker:$(terraform output -raw vm_nginx_vts_docker_ip)" "angie:$(terraform output -raw vm_angie_ip)"; do
+  name="${name_ip%%:*}"; ip="${name_ip##*:}"
+  echo "=== $name ($ip) ==="
+  echo -n "  HTTP: "; curl -s -m 10 -o /dev/null -w "%{http_code}\n" "http://$ip/"
+  echo -n "  Vector: "; curl -s -m 10 -o /dev/null -w "%{http_code}\n" "http://$ip:9598/metrics"
+  case "$name" in
+    nginx-vts-docker)
+      echo -n "  Metrics: "; curl -s -m 10 -o /dev/null -w "%{http_code}\n" "http://$ip:9913/metrics"
+      echo -n "  Status: "; curl -s -m 10 -o /dev/null -w "%{http_code}\n" "http://$ip/status"
+      ;;
+    angie)
+      echo -n "  Metrics: "; curl -s -m 10 -o /dev/null -w "%{http_code}\n" "http://$ip/metrics"
+      echo -n "  API: "; curl -s -m 10 -o /dev/null -w "%{http_code}\n" "http://$ip/api/"
+      ;;
+  esac
+done
+```
+
+#### Запуск k6 jobs для раздела
+
+```bash
+# Оба варианта параллельно (nginx-vts-docker + angie)
 kubectl delete job k6-nginx-vts-docker k6-angie -n benchmark --ignore-not-found
 kubectl apply -f benchmark/manifests/k6-nginx-vts-docker-job.yaml -f benchmark/manifests/k6-angie-job.yaml
 ```
+
+Дождаться завершения (~8м30с на раздел) и собрать результаты (см. шаг 6). Повторить процедуру для каждого из 3 разделов, после чего заполнить таблицу «Ключевые результаты».
+
+> **Важно:** ресурсы VM nginx-vts-docker и angie должны быть **одинаковыми** в рамках одного раздела — иначе сравниваются не прокси, а железо. Между разделами ресурсы меняются ступенчато (2c/4GB → 4c/8GB), чтобы показать, как прокси масштабируются при росте ресурсов и нагрузки.
 
 ### 6. Проверка результатов
 
@@ -372,28 +451,36 @@ cloud-init VM `nginx-vts-docker` собирает образ `nginx:1.31.3-trixi
 
 ## Конфигурация ресурсов и сети VM/K8s
 
-Все инстансы (K8s node group + 2 VM) — **preemptible** (`scheduling_policy.preemptible = true`), платформа `standard-v2`, сеть **software-accelerated** (`network_acceleration_type = "software_accelerated"`):
+Бенчмарк состоит из **3 разделов** с разными ресурсами VM и сетью (см. «Ключевые результаты»). Конкретная конфигурация для каждого раздела задаётся в `benchmark-vms.tf` (`resources`, `network_acceleration_type`) и применяется через `terraform apply` перед прогоном раздела. Ресурсы VM nginx-vts-docker и angie **всегда одинаковые** в рамках одного раздела — чтобы сравнивать прокси, а не железо.
 
-| Ресурс | cores | memory | сеть | preemptible |
+Сводка по всем разделам:
+
+| Раздел | K8s node group | VM nginx-vts-docker | VM angie | Сеть VM |
 |---|---|---|---|---|
-| K8s node group (`k8s-node-group`) | 4 | 8 ГБ | software-accelerated | да |
-| VM `nginx-vts-docker` | 4 | 8 ГБ | software-accelerated | да |
-| VM `angie` | 4 | 8 ГБ | software-accelerated | да |
+| **Low**    | 4 c / 8 ГБ, preemptible | 2 c / 4 ГБ, preemptible | 2 c / 4 ГБ, preemptible | standard |
+| **Medium** | 4 c / 8 ГБ, preemptible | 4 c / 8 ГБ, preemptible | 4 c / 8 ГБ, preemptible | standard |
+| **High**   | 4 c / 8 ГБ, preemptible | 4 c / 8 ГБ, preemptible | 4 c / 8 ГБ, preemptible | software-accelerated |
 
-`software_accelerated` — ускоренная сеть Yandex Cloud (без GPU, доступно на `standard-v2`): снижает overhead на сетевом I/O, что полезно при пиковой нагрузке 300 VU. Включается в `k8s.tf` (`instance_template.network_acceleration_type`) и `benchmark-vms.tf` (верхнеуровневое поле `network_acceleration_type` ресурса `yandex_compute_instance`).
+Все инстансы — платформа `standard-v2`, **preemptible** (`scheduling_policy.preemptible = true`). K8s node group во всех разделах: 4 c / 8 ГБ, `software_accelerated` (не меняется, т.к. нагрузка от k6 идёт через K8s).
+
+`software_accelerated` — ускоренная сеть Yandex Cloud (без GPU, доступно на `standard-v2`): снижает overhead на сетевом I/O. Включается в `k8s.tf` (`instance_template.network_acceleration_type`) и `benchmark-vms.tf` (верхнеуровневое поле `network_acceleration_type` ресурса `yandex_compute_instance`).
 
 > ⚠️ При изменении ресурсов/ускоренной сети Terraform останавливает VM (`allow_stopping_for_update = true`), а Yandex Compute **освобождает ephemeral NAT IP** на stop — после stop/start SSH/HTTP по старому публичному IP перестают отвечать. Процедура восстановления (taint VM → re-apply → обновить k6-env ConfigMap → helm upgrade vmks → restart vmagent) описана в `AGENTS.md`.
 
 ## k6 сценарий нагрузки
 
+k6-скрипт (`benchmark/k6/benchmark.js`) параметризован через env-переменную `MAX_VUS` (пиковое значение VU). Один и тот же сценарий для всех 3 разделов — меняется только `MAX_VUS` (100 / 200 / 300):
+
 1. **Warmup**: 10 VU × 30 сек
 2. **Ramp-up**: 0 → 50 VU за 30 сек
 3. **Sustained**: 50 VU × 120 сек
-4. **Peak ramp**: 50 → 100 VU за 30 сек
-5. **Peak sustained**: 100 VU × 120 сек
-6. **High peak ramp**: 100 → 300 VU за 30 сек
-7. **High peak sustained**: 300 VU × 120 сек
-8. **Cooldown**: 300 → 0 VU за 30 сек
+4. **Peak ramp**: 50 → `MAX_VUS` × 0.5 за 30 сек
+5. **Peak sustained (mid)**: `MAX_VUS` × 0.5 × 120 сек
+6. **High peak ramp**: `MAX_VUS` × 0.5 → `MAX_VUS` за 30 сек
+7. **High peak sustained**: `MAX_VUS` × 120 сек
+8. **Cooldown**: `MAX_VUS` → 0 за 30 сек
+
+При `MAX_VUS=300` промежуточная ступень = 150 (ранее была 100, но логика та же — ramp через половину пика). Значение `MAX_VUS` передаётся в k6 job через env (см. `benchmark/templates/k6-job.yaml.tftpl`), по умолчанию 300. Общая длительность — 8м30с (30с warmup + 8м load).
 
 ## Соответствие метрик nginx-vts и angie
 
