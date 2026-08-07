@@ -196,10 +196,14 @@ kubectl apply -f benchmark/manifests/benchmark-dashboard-configmap.yaml
 
 ### 4. Применение benchmark-манифестов
 
+Terraform рендерит 4 отдельных backend-манифеста (по одному на backend: `backend-vts-1/2.yaml`, `backend-angie-1/2.yaml`) из шаблона `benchmark/templates/backend.yaml.tftpl` — каждый содержит и Deployment, и Service. Команда также выводится в `terraform output kubectl_apply_benchmark_command`:
+
 ```bash
-# Namespace, backend, ConfigMap с k6-скриптом
+# Namespace, 4 backend'а (Deployment+Service, NodePort), ConfigMap'ы с k6-скриптом и env
 kubectl apply -f benchmark/manifests/namespace.yaml
-kubectl apply -f benchmark/manifests/backend-deployment.yaml -f benchmark/manifests/backend-service.yaml -f benchmark/manifests/k6-script-configmap.yaml -f benchmark/manifests/k6-env-configmap.yaml
+kubectl apply -f benchmark/manifests/backend-vts-1.yaml -f benchmark/manifests/backend-vts-2.yaml \
+  -f benchmark/manifests/backend-angie-1.yaml -f benchmark/manifests/backend-angie-2.yaml \
+  -f benchmark/manifests/k6-script-configmap.yaml -f benchmark/manifests/k6-env-configmap.yaml
 ```
 
 ### 5. Запуск бенчмарка
@@ -222,20 +226,31 @@ kubectl logs job/k6-nginx-vts-docker -n benchmark
 kubectl logs job/k6-angie -n benchmark
 
 # Проверка сервисов на VM
+# У каждого прокси свой порт метрик: nginx-vts-docker отдаёт :9913/metrics (nginx-vts-exporter),
+# angie — :80/metrics (нативный Prometheus). Поэтому endpoint метрик выбирается по имени варианта,
+# а не через конструкцию `curl ... || curl ...` (она склеивает выводы обоих curl в строку вида "000200").
 for name_ip in "nginx-vts-docker:$(terraform output -raw vm_nginx_vts_docker_ip)" "angie:$(terraform output -raw vm_angie_ip)"; do
   name="${name_ip%%:*}"; ip="${name_ip##*:}"
   echo "=== $name ($ip) ==="
-  echo -n "  HTTP: "; curl -s -o /dev/null -w "%{http_code}" "http://$ip/" || echo "FAIL"; echo ""
-  echo -n "  Metrics: "; curl -s -o /dev/null -w "%{http_code}" "http://$ip:9913/metrics" 2>/dev/null || curl -s -o /dev/null -w "%{http_code}" "http://$ip/metrics"; echo ""
-  echo -n "  Vector: "; curl -s -o /dev/null -w "%{http_code}" "http://$ip:9598/metrics" || echo "N/A"; echo ""
-  echo -n "  Status/API: "; curl -s -o /dev/null -w "%{http_code}" "http://$ip/status" 2>/dev/null || curl -s -o /dev/null -w "%{http_code}" "http://$ip/api/"; echo ""
+  echo -n "  HTTP: "; curl -s -m 10 -o /dev/null -w "%{http_code}\n" "http://$ip/" || echo "FAIL"
+  echo -n "  Vector: "; curl -s -m 10 -o /dev/null -w "%{http_code}\n" "http://$ip:9598/metrics" || echo "N/A"
+  case "$name" in
+    nginx-vts-docker)
+      echo -n "  Metrics: "; curl -s -m 10 -o /dev/null -w "%{http_code}\n" "http://$ip:9913/metrics" || echo "FAIL"
+      echo -n "  Status: "; curl -s -m 10 -o /dev/null -w "%{http_code}\n" "http://$ip/status" || echo "FAIL"
+      ;;
+    angie)
+      echo -n "  Metrics: "; curl -s -m 10 -o /dev/null -w "%{http_code}\n" "http://$ip/metrics" || echo "FAIL"
+      echo -n "  API: "; curl -s -m 10 -o /dev/null -w "%{http_code}\n" "http://$ip/api/" || echo "FAIL"
+      ;;
+  esac
 done
 
 # Web-консоль Angie (Console Light) — открывается в браузере
 # (после terraform apply с обновлённым cloud-init; HTTP 200 + HTML отдаёт Console Light,
 #  а не backend — последний отвечает "OK" на любой путь через location /)
 ANGIE_IP=$(terraform output -raw vm_angie_ip)
-curl -s -o /dev/null -w "Angie Console Light: HTTP %{http_code}\n" "http://angie-console.$ANGIE_IP.sslip.io/console/"
+curl -s -m 10 -o /dev/null -w "Angie Console Light: HTTP %{http_code}\n" "http://angie-console.$ANGIE_IP.sslip.io/console/"
 echo "Открыть в браузере: http://angie-console.$ANGIE_IP.sslip.io/console/"
 
 # SSH на VM (пользователь ubuntu)
