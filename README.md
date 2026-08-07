@@ -374,6 +374,44 @@ cloud-init VM `nginx-vts-docker` собирает образ `nginx:1.31.3-trixi
 
 Проверено из VM Yandex Cloud: `mirror.gcr.io/v2/timberio/vector/manifests/0.57.0-debian` → `HTTP 200` (тогда как прямой `registry-1.docker.io` периодически таймаутит). Прямой `download.docker.com/linux/ubuntu/dists/jammy/stable/binary-amd64/Packages.bz2` → `HTTP 200` с корректным размером (тогда как `mirror.yandex.ru` в моменты синхронизации отдаёт неверный размер).
 
+## Конфигурация ресурсов и сети VM/K8s
+
+Все инстансы (K8s node group + 2 VM) — **preemptible** (`scheduling_policy.preemptible = true`), платформа `standard-v2`, сеть **software-accelerated** (`network_acceleration_type = "software_accelerated"`):
+
+| Ресурс | cores | memory | сеть | preemptible |
+|---|---|---|---|---|
+| K8s node group (`k8s-node-group`) | 4 | 8 ГБ | software-accelerated | да |
+| VM `nginx-vts-docker` | 4 | 8 ГБ | software-accelerated | да |
+| VM `angie` | 4 | 8 ГБ | software-accelerated | да |
+
+`software_accelerated` — ускоренная сеть Yandex Cloud (без GPU, доступно на `standard-v2`): снижает overhead на сетевом I/O, что полезно при пиковой нагрузке 300 VU. Включается в `k8s.tf` (`instance_template.network_acceleration_type`) и `benchmark-vms.tf` (верхнеуровневое поле `network_acceleration_type` ресурса `yandex_compute_instance`).
+
+### Потеря ephemeral NAT IP при stop/start VM
+
+Обе VM используют **ephemeral** NAT IP (`network_interface.nat = true` без явного `nat_ip_address`). При любом изменении ресурсов/платформы/ускоренной сети Terraform останавливает VM (`allow_stopping_for_update = true` в `benchmark-vms.tf` — обязательно для in-place обновления), а Yandex Compute **освобождает ephemeral NAT IP** на stop и не привязывает его обратно на start. Симптом: VM `RUNNING` с внутренним IP, но `nat_ip_address: None`, SSH/HTTP по старому публичному IP не отвечают, `terraform output` всё ещё показывает устаревший адрес.
+
+**Восстановление** (выполнено в этом бенчмарке при апгрейде ресурсов):
+
+```bash
+# 1. taint-нуть обе VM, чтобы Terraform пересоздал их с новым ephemeral NAT IP
+terraform taint yandex_compute_instance.angie
+terraform taint yandex_compute_instance.nginx-vts-docker
+terraform apply -auto-approve
+# новые IP появятся в terraform output vm_angie_ip / vm_nginx_vts_docker_ip
+
+# 2. перегенерированные манифесты применить в K8s (k6-env ConfigMap с новыми target IP)
+kubectl apply -f ./benchmark/manifests/k6-env-configmap.yaml
+
+# 3. перегенерированный vmagent scrape config (values/victoriametrics-values.yaml) — helm upgrade vmks
+helm upgrade vmks victoriametrics/victoria-metrics-k8s-stack --version 0.87.0 --namespace vmks \
+  -f ./values/victoriametrics-values.yaml
+
+# 4. workaround бага #3136 (см. шаг 3): рестарт vmagent, иначе config-reloader не перечитает Secret
+kubectl rollout restart deployment vmagent-vm-stack -n vmks
+```
+
+> Для production имеет смысл привязать статический IP (`yandex_vpc_address` + `nat_ip_address` в `network_interface`), чтобы переживать stop/start без смены адресов. В этом бенчмарке ephemeral IP допустим, т.к. IP используется только на время замера, а все зависимые ресурсы (k6-env ConfigMap, vmagent scrape targets) перегенерируются Terraform'ом и применяются одной командой.
+
 ## k6 сценарий нагрузки
 
 1. **Warmup**: 10 VU × 30 сек

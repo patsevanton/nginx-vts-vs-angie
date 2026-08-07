@@ -18,13 +18,15 @@ locals {
 }
 
 resource "yandex_compute_instance" "nginx-vts-docker" {
-  name        = "nginx-vts-docker"
-  platform_id = "standard-v2"
-  zone        = yandex_vpc_subnet.nginx-vts-vs-angie-a.zone
+  name                      = "nginx-vts-docker"
+  platform_id               = "standard-v2"
+  network_acceleration_type = "software_accelerated"
+  allow_stopping_for_update = true
+  zone                      = yandex_vpc_subnet.nginx-vts-vs-angie-a.zone
 
   resources {
-    cores  = 2
-    memory = 4
+    cores  = 4
+    memory = 8
   }
 
   scheduling_policy {
@@ -55,13 +57,15 @@ resource "yandex_compute_instance" "nginx-vts-docker" {
 }
 
 resource "yandex_compute_instance" "angie" {
-  name        = "angie"
-  platform_id = "standard-v2"
-  zone        = yandex_vpc_subnet.nginx-vts-vs-angie-a.zone
+  name                      = "angie"
+  platform_id               = "standard-v2"
+  network_acceleration_type = "software_accelerated"
+  allow_stopping_for_update = true
+  zone                      = yandex_vpc_subnet.nginx-vts-vs-angie-a.zone
 
   resources {
-    cores  = 2
-    memory = 4
+    cores  = 4
+    memory = 8
   }
 
   scheduling_policy {
