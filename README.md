@@ -12,13 +12,13 @@
 
 | Раздел | MAX_VUS | Ресурсы VM (cores/RAM) | Сеть | Ожидаемое RPS |
 |---|---|---|---|---|
-| **Low**    | 100 | 2 c / 4 ГБ | standard              | ~1500–2000 |
-| **Medium** | 200 | 4 c / 8 ГБ | standard              | ~3000–4000 |
-| **High**   | 300 | 4 c / 8 ГБ | software-accelerated  | ~4500–5500 |
+| **Low**    | 100 | 2 c / 4 ГБ | software-accelerated | ~1500–2000 |
+| **Medium** | 200 | 4 c / 8 ГБ | software-accelerated | ~3000–4000 |
+| **High**   | 300 | 4 c / 8 ГБ | software-accelerated | ~4500–5500 |
 
 > Конфигурация ресурсов и сети задаётся в `benchmark-vms.tf` (`resources`, `network_acceleration_type`), пиковое VU — через env `MAX_VUS` в `benchmark/templates/k6-job.yaml.tftpl`. Перед каждым разделом: `terraform apply` (обновить ресурсы VM) → дождаться cloud-init → health-check VM → запустить k6 jobs → собрать результаты. Подробная процедура — в шаге 5.
 
-### Раздел 1: Low (100 VU, 2 c / 4 ГБ, standard network)
+### Раздел 1: Low (100 VU, 2 c / 4 ГБ, software-accelerated network)
 
 | Метрика | nginx-vts-docker | Angie |
 |---------|------------------|-------|
@@ -28,7 +28,7 @@
 | Ошибки (rate) | _заполнить_ | _заполнить_ |
 | Макс. VU | 100 | 100 |
 
-### Раздел 2: Medium (200 VU, 4 c / 8 ГБ, standard network)
+### Раздел 2: Medium (200 VU, 4 c / 8 ГБ, software-accelerated network)
 
 | Метрика | nginx-vts-docker | Angie |
 |---------|------------------|-------|
@@ -242,7 +242,7 @@ kubectl apply -f benchmark/manifests/backend-vts-1.yaml -f benchmark/manifests/b
 
 #### Подготовка раздела (общая процедура для каждого из 3 разделов)
 
-1. Задать ресурсы VM и сеть в `benchmark-vms.tf` согласно таблице раздела (Low: 2 c / 4 ГБ / standard; Medium: 4 c / 8 ГБ / standard; High: 4 c / 8 ГБ / software-accelerated).
+1. Задать ресурсы VM в `benchmark-vms.tf` согласно таблице раздела (Low: 2 c / 4 ГБ; Medium: 4 c / 8 ГБ; High: 4 c / 8 ГБ). Сеть `software_accelerated` во всех разделах — не меняется.
 2. Задать `MAX_VUS` (100 / 200 / 300) в `benchmark/templates/k6-job.yaml.tftpl` (env `MAX_VUS`).
 3. Применить изменения и дождаться поднятия сервисов:
 
@@ -457,11 +457,11 @@ cloud-init VM `nginx-vts-docker` собирает образ `nginx:1.31.3-trixi
 
 | Раздел | K8s node group | VM nginx-vts-docker | VM angie | Сеть VM |
 |---|---|---|---|---|
-| **Low**    | 4 c / 8 ГБ, preemptible | 2 c / 4 ГБ, preemptible | 2 c / 4 ГБ, preemptible | standard |
-| **Medium** | 4 c / 8 ГБ, preemptible | 4 c / 8 ГБ, preemptible | 4 c / 8 ГБ, preemptible | standard |
+| **Low**    | 4 c / 8 ГБ, preemptible | 2 c / 4 ГБ, preemptible | 2 c / 4 ГБ, preemptible | software-accelerated |
+| **Medium** | 4 c / 8 ГБ, preemptible | 4 c / 8 ГБ, preemptible | 4 c / 8 ГБ, preemptible | software-accelerated |
 | **High**   | 4 c / 8 ГБ, preemptible | 4 c / 8 ГБ, preemptible | 4 c / 8 ГБ, preemptible | software-accelerated |
 
-Все инстансы — платформа `standard-v2`, **preemptible** (`scheduling_policy.preemptible = true`). K8s node group во всех разделах: 4 c / 8 ГБ, `software_accelerated` (не меняется, т.к. нагрузка от k6 идёт через K8s).
+Все инстансы — платформа `standard-v2`, **preemptible** (`scheduling_policy.preemptible = true`), сеть **software-accelerated** (`network_acceleration_type = "software_accelerated"`). K8s node group во всех разделах: 4 c / 8 ГБ (не меняется, т.к. нагрузка от k6 идёт через K8s).
 
 `software_accelerated` — ускоренная сеть Yandex Cloud (без GPU, доступно на `standard-v2`): снижает overhead на сетевом I/O. Включается в `k8s.tf` (`instance_template.network_acceleration_type`) и `benchmark-vms.tf` (верхнеуровневое поле `network_acceleration_type` ресурса `yandex_compute_instance`).
 
