@@ -2,10 +2,6 @@
 
 Инфраструктура как код (Terraform) и методика объективного сравнения двух популярных веб-прокси: **nginx с модулем VTS** (nginx-module-vts + nginx-vts-exporter) и **Angie** (форк nginx от «Веб-Сервера» с нативной поддержкой метрик Prometheus). Бенчмарк полностью воспроизводим: от развёртывания VM и Kubernetes-кластера до Grafana-дашборда с результатами.
 
-> **Требование к версии Kubernetes:** бенчмарк проверен на **Managed Kubernetes 1.33** (release channel `STABLE`). В `k8s.tf` версия жёстко задана как `1.33` и для master, и для node group. Yandex Managed Kubernetes также поддерживает 1.32/1.34/1.35 (канал `RAPID`/`REGULAR`) — если хотите другую версию, измените `version` в `k8s.tf` (две позиции: `master.version` и `yandex_kubernetes_node_group.k8s-node-group.version`). На 1.32 и младше Helm-чарт `victoria-metrics-k8s-stack 0.88.0` может требовать более старых API-версий CRD.
->
-> **Требование к версии чарта VictoriaMetrics:** используется `victoria-metrics-k8s-stack 0.88.0` — баг `config-reloader` на K8s 1.33 (VMAgent не перечитывал Secret со скрейп-конфигом при пересоздании VM/смене IP, скрейпы шли на устаревшие адреса, см. <https://github.com/VictoriaMetrics/helm-charts/issues/3136>) исправлен в этой версии. На более старых версиях чарта (0.87.0 и младше) использовать workaround: `kubectl rollout restart deployment vmagent-vm-stack -n vmks` после смены IP VM.
-
 ## Ключевые результаты
 
 Бенчмарк разбит на **3 раздела** по уровню нагрузки и ресурсов VM. В каждом разделе ресурсы VM nginx-vts-docker и angie **одинаковые** — чтобы сравнивать прокси, а не железо. k6-сценарий один и тот же (warmup 10 VU × 30с + ramp 0→50→…→MAX_VUS→0 за 8м), меняется только пиковое значение VU (`MAX_VUS`).
@@ -196,11 +192,11 @@ helm repo update
 # VictoriaMetrics (k8s-stack: vmoperator, vmagent, vmselect, vminsert, Grafana)
 helm upgrade --install vmks \
   victoriametrics/victoria-metrics-k8s-stack \
-  --version 0.88.0 \
+  --version 0.90.1 \
   --namespace vmks --create-namespace \
   -f ./values/victoriametrics-values.yaml
 
-# Версия victoria-metrics-k8s-stack 0.88.0 содержит исправление бага config-reloader'а
+# Версия victoria-metrics-k8s-stack 0.90.1 содержит исправление бага config-reloader'а
 # VMAgent на Kubernetes 1.33 (issue https://github.com/VictoriaMetrics/helm-charts/issues/3136):
 # ранее config-reloader не перечитывал Secret с конфигом скрейпов при пересоздании VM / смене IP,
 # и без kubectl rollout restart deployment vmagent-vm-stack -n vmks скрейпы шли на устаревшие
@@ -266,7 +262,7 @@ terraform apply -auto-approve
 # Если у каких-то VM сменился публичный IP (ephemeral NAT): taint + re-apply (см. AGENTS.md)
 # Затем повторно применить k6-env ConfigMap и vmagent scrape config с новыми IP:
 kubectl apply -f ./benchmark/manifests/k6-env-configmap.yaml
-helm upgrade vmks victoriametrics/victoria-metrics-k8s-stack --version 0.88.0 --namespace vmks \
+helm upgrade vmks victoriametrics/victoria-metrics-k8s-stack --version 0.90.1 --namespace vmks \
   -f ./values/victoriametrics-values.yaml
 kubectl rollout restart deployment vmagent-vm-stack -n vmks 2>/dev/null || true
 

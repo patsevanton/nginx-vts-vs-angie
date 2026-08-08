@@ -204,7 +204,8 @@ runcmd:
   - echo "deb https://download.angie.software/angie/ubuntu/22.04 jammy main" > /etc/apt/sources.list.d/angie.list
   - apt-get update
   # Сохраняем наш /etc/angie/angie.conf при установке пакета (избегаем интерактивного conffile prompt)
-  - apt-get install -y -o Dpkg::Options::="--force-confold" angie angie-console-light
+  # Версии зафиксированы: angie 1.12.1, angie-console-light 1.8.2 (ubuntu 22.04/jammy)
+  - apt-get install -y -o Dpkg::Options::="--force-confold" angie=1.12.1-1~jammy angie-console-light=1.8.2-1~jammy
   - mkdir -p /var/log/angie
   # mime.types может отсутствовать, если dpkg не завершил конфигурацию — завершаем вручную
   - test -f /etc/angie/mime.types || cp /etc/angie/mime.types.dpkg-new /etc/angie/mime.types

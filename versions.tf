@@ -2,7 +2,7 @@ terraform {
   required_providers {
     yandex = {
       source  = "yandex-cloud/yandex"
-      version = "0.219.0"
+      version = "0.220.0"
     }
     null = {
       source  = "hashicorp/null"
@@ -18,11 +18,11 @@ terraform {
     }
     kubernetes = {
       source  = "hashicorp/kubernetes"
-      version = "3.0.1"
+      version = "3.2.1"
     }
     helm = {
       source  = "hashicorp/helm"
-      version = "3.1.1"
+      version = "3.2.0"
     }
   }
   required_version = ">= 1.3"
