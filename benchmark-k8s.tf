@@ -6,17 +6,17 @@ locals {
   })
 
   # 12 backend'ов: по 2 на каждую из 6 VM.
-  # Имя: backend-<variant>-<section>-<n>, NodePort из benchmark_sections[section].
+  # Имя: backend-<variant>-<section>-<n>, NodePort уникален на вариант:
+  # nginx-vts -> базовые порты раздела (30085/86, 30087/88, 30089/90),
+  # angie     -> базовые порты + 6 (30091/92, 30093/94, 30095/96).
   # Каждый backend — Deployment + Service (NodePort) из шаблона backend.yaml.tftpl.
   benchmark_backends = {
-    for sv_n in flatten([
-      for section, cfg in local.benchmark_sections : [
-        for variant in ["nginx-vts", "angie"] : [
-          { name = "backend-${variant}-${section}-1", node_port = cfg.nodeport_1 },
-          { name = "backend-${variant}-${section}-2", node_port = cfg.nodeport_2 },
-        ]
+    for pair in flatten([
+      for vm_name, vm in local.benchmark_vms : [
+        { name = "backend-${vm_name}-1", node_port = vm.nodeport_1 },
+        { name = "backend-${vm_name}-2", node_port = vm.nodeport_2 },
       ]
-    ]) : sv_n.name => sv_n.node_port
+    ]) : pair.name => pair.node_port
   }
 
   benchmark_backend_configs = {

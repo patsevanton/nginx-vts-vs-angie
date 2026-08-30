@@ -14,9 +14,11 @@ locals {
   # 3 раздела бенчмарка: Low / Medium / High.
   # Каждый раздел = 2 VM (nginx-vts + angie) + 2 backend'а (NodePort) + 1 k6-джоба на вариант.
   # Все 6 VM поднимаются одновременно — разделы идут параллельно, без пересоздания VM.
-  # nodeport_base задаёт стартовый NodePort раздела (шаг 2): low=30085, medium=30087, high=30089.
+  # nodeport_1 / nodeport_2 задают базовую пару NodePort раздела (шаг 2).
   #   - <base>     -> backend-<variant>-<section>-1
   #   - <base>+1   -> backend-<variant>-<section>-2
+  # Внутри раздела варианты получают РАЗНЫЕ порты через nodeport_variant_offset (см. ниже),
+  # чтобы 12 backend'ов (2 варианта × 3 раздела × 2 peer'а) имели 12 уникальных NodePort.
   benchmark_sections = {
     low = {
       max_vus    = 100
@@ -41,6 +43,15 @@ locals {
     }
   }
 
+  # Смещение NodePort между вариантами внутри одного раздела.
+  # nginx-vts берёт базовые порты раздела: low=30085/86, medium=30087/88, high=30089/90
+  # angie  берёт базовые порты + 6:     low=30091/92, medium=30093/94, high=30095/96
+  # Итого 12 уникальных NodePort 30085–30096 на 12 backend'ов.
+  nodeport_variant_offset = {
+    "nginx-vts" = 0
+    "angie"     = 6
+  }
+
   # 6 VM: для каждого раздела — по 2 (nginx-vts + angie).
   # variant nginx-vts использует docker-compose cloud-init, variant angie — deb-пакет.
   # key имеет вид "<variant>-<section>" (например "nginx-vts-low") — это имя ресурса и hostname VM.
@@ -52,8 +63,8 @@ locals {
       cores      = local.benchmark_sections[sv[1]].cores
       memory     = local.benchmark_sections[sv[1]].memory
       max_vus    = local.benchmark_sections[sv[1]].max_vus
-      nodeport_1 = local.benchmark_sections[sv[1]].nodeport_1
-      nodeport_2 = local.benchmark_sections[sv[1]].nodeport_2
+      nodeport_1 = local.benchmark_sections[sv[1]].nodeport_1 + local.nodeport_variant_offset[sv[0]]
+      nodeport_2 = local.benchmark_sections[sv[1]].nodeport_2 + local.nodeport_variant_offset[sv[0]]
     }
   }
 }

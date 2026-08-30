@@ -51,39 +51,44 @@
 
 ## Архитектура
 
-```
-┌─────────────────┐     ┌──────────────────────────────────┐     ┌────────────────────────────────┐
-│   Источник       │     │   Прокси (6 VM, по 2 на раздел)   │     │   Приёмник (K8s, 12 backend'ов) │
-│   трафика (k6)  │────▶│                                  │────▶│                                │
-│   в K8s         │     │  ×3 раздела (low/medium/high):    │     │  ×3 раздела, по 2 на вариант:  │
-│   6 k6-джоб     │     │                                  │     │   backend-nginx-vts-<s>-1/2     │
-│   (по 1 на VM)  │     │  nginx-vts-<s>: docker-compose   │     │     (NodePort 30085/86, 87/88,  │
-│                 │     │    + nginx-vts-exporter :9913     │     │      89/90 — low/med/high)      │
-│                 │     │    + vector → VictoriaLogs        │     │   backend-angie-<s>-1/2         │
-│                 │     │    upstream backend {            │     │     (NodePort 30085/86, 87/88,  │
-│                 │     │     server <node_ip>:<port_1>;    │     │      89/90 — low/med/high)      │
-│                 │     │     server <node_ip>:<port_2>;    │     │   (http-echo, replicas: 1)     │
-│                 │     │   }                              │     │                                │
-│                 │     │                                  │     │  upstreamZones / peers:         │
-│                 │     │  angie-<s>: deb-пакет             │     │   2 peer'а на прокси            │
-│                 │     │    + нативные метрики :80/metrics │     │                                │
-│                 │     │    + vector → VictoriaLogs        │     │                                │
-│                 │     │    upstream backend {            │     │                                │
-│                 │     │     server <node_ip>:<port_1>;    │     │                                │
-│                 │     │     server <node_ip>:<port_2>;    │     │                                │
-│                 │     │   }                              │     │                                │
-└─────────────────┘     └──────────────────────────────────┘     └────────────────────────────────┘
-          │                          │                                      │
-          │                          ▼                                      │
-          │               ┌──────────────────┐                              │
-          │               │  VictoriaMetrics  │◀─ scrape /metrics всех 6 VM │
-          │               │  VictoriaLogs     │◀─ vector (newline_delimited) │
-          │               │  Grafana          │                              │
-          │               └──────────────────┘                              │
-          └─────────────── k6 metrics ─────────────────────────────────────┘
+```mermaid
+flowchart LR
+    subgraph K8s["Kubernetes (Yandex Managed)"]
+        K6["k6 — 6 джоб<br/>k6-&lt;variant&gt;-&lt;section&gt;<br/>MAX_VUS = 100 / 200 / 300"]
+
+        subgraph BE["namespace benchmark — 12 backend'ов"]
+            direction TB
+            BN["backend-nginx-vts-&lt;section&gt;-1/2<br/>http-echo, replicas: 1"]
+            BA["backend-angie-&lt;section&gt;-1/2<br/>http-echo, replicas: 1"]
+        end
+    end
+
+    subgraph PX["Прокси — 6 VM (по 2 на раздел low/medium/high)"]
+        NVTS["nginx-vts-&lt;section&gt;<br/>docker-compose + nginx-vts-exporter :9913<br/>+ vector"]
+        ANGIE["angie-&lt;section&gt;<br/>deb-пакет, нативные метрики :80/metrics<br/>+ vector"]
+    end
+
+    subgraph MON["Мониторинг и логи (namespace vmks / vlcluster / vlcollector)"]
+        VM["VictoriaMetrics (vmagent)"]
+        VL["VictoriaLogs"]
+        G["Grafana"]
+    end
+
+    K6 --> NVTS
+    K6 --> ANGIE
+    NVTS -->|"upstream backend { server &lt;node_ip&gt;:&lt;port_1&gt;; server &lt;node_ip&gt;:&lt;port_2&gt;; }"| BN
+    ANGIE -->|"upstream backend + zone upstream_backend 64k"| BA
+
+    NVTS -->|"scrape :9913 /metrics"| VM
+    ANGIE -->|"scrape :80 /metrics"| VM
+    NVTS -->|"vector (newline_delimited)"| VL
+    ANGIE -->|"vector (newline_delimited)"| VL
+    VM --> G
+    VL --> G
+    K6 -.->|"k6 metrics"| VM
 ```
 
-Бенчмарк поднимает **6 VM** (по 2 на раздел: `nginx-vts-<section>` + `angie-<section>`) и **12 backend'ов** (по 2 на каждую VM, NodePort 30085–30090) одним `terraform apply`. Каждый прокси балансирует на **2 отдельных бэкенда** через upstream (round-robin), свои для каждой VM: например `nginx-vts-low` → `backend-nginx-vts-low-1` (NodePort 30085) + `backend-nginx-vts-low-2` (NodePort 30086). Бэкенды — отдельные Deployment+Service (по 1 поду `hashicorp/http-echo` каждый) в namespace `benchmark`. Разделение по разделам нужно, чтобы одновременный запуск 3 разделов не суммировал нагрузку на общих бэкендах, а в метриках upstream (`nginx_upstream_*`, `angie_http_upstreams_peers_*`) было видно 2 peer'а на прокси.
+Бенчмарк поднимает **6 VM** (по 2 на раздел: `nginx-vts-<section>` + `angie-<section>`) и **12 backend'ов** (по 2 на каждую VM, NodePort 30085–30096: варианту `nginx-vts` отданы порты 30085–30090, варианту `angie` — 30091–30096) одним `terraform apply`. Каждый прокси балансирует на **2 отдельных бэкенда** через upstream (round-robin), свои для каждой VM: например `nginx-vts-low` → `backend-nginx-vts-low-1` (NodePort 30085) + `backend-nginx-vts-low-2` (NodePort 30086), а `angie-low` → `backend-angie-low-1` (NodePort 30091) + `backend-angie-low-2` (NodePort 30092). Бэкенды — отдельные Deployment+Service (по 1 поду `hashicorp/http-echo` каждый) в namespace `benchmark`. Разделение по разделам нужно, чтобы одновременный запуск 3 разделов не суммировал нагрузку на общих бэкендах, а в метриках upstream (`nginx_upstream_*`, `angie_http_upstreams_peers_*`) было видно 2 peer'а на прокси.
 
 ## Сравниваемые варианты
 
@@ -148,7 +153,7 @@
 | `k8s.tf` | K8s-кластер, ноды, Helm-релиз Ingress, генерация values с IP |
 | `variables.tf` | Переменные (параметры разделов заданы в `local.benchmark_sections` в `benchmark-vms.tf`) |
 | `benchmark-vms.tf` | 6 VM (2 на раздел: `nginx-vts-<section>` + `angie-<section>`) через `for_each`, `local.benchmark_sections` — `max_vus`/`cores`/`memory`/`nodeport_*` |
-| `benchmark-k8s.tf` | Namespace "benchmark", 12 бэкендов (по 2 на каждую VM, NodePort 30085–30090), ConfigMap с k6-скриптом и k6-env (6 IP) |
+| `benchmark-k8s.tf` | Namespace "benchmark", 12 бэкендов (по 2 на каждую VM, NodePort 30085–30096: nginx-vts 30085–30090, angie 30091–30096), ConfigMap с k6-скриптом и k6-env (6 IP) |
 | `benchmark-runners.tf` | 6 k6 Job (по одной на variant×section со своим `MAX_VUS`) через `for_each` |
 | `values/victoriametrics-values.yaml` | Helm values: VictoriaMetrics + Grafana + vmagent (генерируется, scrape всех 6 VM) |
 | `values/victoria-logs-cluster-values.yaml` | Helm values: VictoriaLogs cluster + vlinsert ingress (генерируется) |
@@ -228,7 +233,7 @@ kubectl apply -f benchmark/manifests/benchmark-dashboard-configmap.yaml
 Terraform рендерит 12 отдельных backend-манифестов (по одному на backend: `backend-<variant>-<section>-1/2.yaml`) из шаблона `benchmark/templates/backend.yaml.tftpl` — каждый содержит и Deployment, и Service. Команда также выводится в `terraform output kubectl_apply_benchmark_command`:
 
 ```bash
-# Namespace, 12 backend'ов (Deployment+Service, NodePort 30085-30090), ConfigMap'ы с k6-скриптом и env (6 IP)
+# Namespace, 12 backend'ов (Deployment+Service, NodePort 30085-30096), ConfigMap'ы с k6-скриптом и env (6 IP)
 kubectl apply -f benchmark/manifests/namespace.yaml
 kubectl apply -f benchmark/manifests/backend-nginx-vts-low-1.yaml -f benchmark/manifests/backend-nginx-vts-low-2.yaml \
   -f benchmark/manifests/backend-nginx-vts-medium-1.yaml -f benchmark/manifests/backend-nginx-vts-medium-2.yaml \
@@ -241,17 +246,17 @@ kubectl apply -f benchmark/manifests/backend-nginx-vts-low-1.yaml -f benchmark/m
 
 ### 5. Запуск бенчмарка
 
-Бенчмарк состоит из **3 разделов** (Low / Medium / High — см. «Ключевые результаты»). **Все 3 раздела запускаются одновременно**: Terraform поднимает 6 VM (2 на раздел: `nginx-vts-<section>` + `angie-<section>`), 12 backend'ов в K8s (по 2 на каждую VM, NodePort 30085–30090) и рендерит 6 k6-джоб (по одной на вариант×раздел со своим `MAX_VUS`). Каждый раздел имеет собственные VM и backend'ы, поэтому разделы не влияют друг на друга. Результаты каждого раздела заносятся в таблицу «Ключевые результаты».
+Бенчмарк состоит из **3 разделов** (Low / Medium / High — см. «Ключевые результаты»). **Все 3 раздела запускаются одновременно**: Terraform поднимает 6 VM (2 на раздел: `nginx-vts-<section>` + `angie-<section>`), 12 backend'ов в K8s (по 2 на каждую VM, NodePort 30085–30096) и рендерит 6 k6-джоб (по одной на вариант×раздел со своим `MAX_VUS`). Каждый раздел имеет собственные VM и backend'ы, поэтому разделы не влияют друг на друга. Результаты каждого раздела заносятся в таблицу «Ключевые результаты».
 
 #### Подготовка (один раз для всех 3 разделов)
 
-Ресурсы VM, `MAX_VUS` и NodePort'ы заданы декларативно в `local.benchmark_sections` в `benchmark-vms.tf` — править файлы руками между разделами не нужно:
+Ресурсы VM, `MAX_VUS` и NodePort'ы заданы декларативно в `local.benchmark_sections` в `benchmark-vms.tf` — править файлы руками между разделами не нужно. Порты `nginx-vts` — базовые, порты `angie` — базовые + 6 (`local.nodeport_variant_offset`):
 
-| Раздел | `max_vus` | `cores`/`memory` | `nodeport_1`/`nodeport_2` |
-|---|---|---|---|
-| `low`    | 100 | 2 / 4 | 30085 / 30086 |
-| `medium` | 200 | 4 / 8 | 30087 / 30088 |
-| `high`   | 300 | 4 / 8 | 30089 / 30090 |
+| Раздел | `max_vus` | `cores`/`memory` | `nodeport_1`/`nodeport_2` (nginx-vts) | `nodeport_1`/`nodeport_2` (angie) |
+|---|---|---|---|---|
+| `low`    | 100 | 2 / 4 | 30085 / 30086 | 30091 / 30092 |
+| `medium` | 200 | 4 / 8 | 30087 / 30088 | 30093 / 30094 |
+| `high`   | 300 | 4 / 8 | 30089 / 30090 | 30095 / 30096 |
 
 1. Применить инфраструктуру и дождаться поднятия сервисов на всех 6 VM:
 
@@ -414,8 +419,8 @@ http {
 
     upstream backend {
         zone upstream_backend 64k;             # обязательно для сбора статистики upstream
-        server <node_ip>:30083;                 # backend-angie-1 (NodePort)
-        server <node_ip>:30084;                 # backend-angie-2 (NodePort)
+        server <node_ip>:<port_1>;                 # backend-angie-<section>-1 (NodePort)
+        server <node_ip>:<port_2>;                 # backend-angie-<section>-2 (NodePort)
         keepalive 64;
     }
 
@@ -474,11 +479,11 @@ cloud-init VM `nginx-vts-docker` собирает образ `nginx:1.31.3-trixi
 
 Сводка по всем разделам (6 VM + 12 backend'ов поднимаются одновременно):
 
-| Раздел | K8s node group | VM nginx-vts-\<section\> | VM angie-\<section\> | NodePort'ы (2 backend'а) | Сеть VM |
-|---|---|---|---|---|---|
-| **Low**    | 4 c / 8 ГБ, preemptible | 2 c / 4 ГБ, preemptible | 2 c / 4 ГБ, preemptible | 30085 / 30086 | software-accelerated |
-| **Medium** | 4 c / 8 ГБ, preemptible | 4 c / 8 ГБ, preemptible | 4 c / 8 ГБ, preemptible | 30087 / 30088 | software-accelerated |
-| **High**   | 4 c / 8 ГБ, preemptible | 4 c / 8 ГБ, preemptible | 4 c / 8 ГБ, preemptible | 30089 / 30090 | software-accelerated |
+| Раздел | K8s node group | VM nginx-vts-\<section\> | VM angie-\<section\> | NodePort'ы nginx-vts (2 backend'а) | NodePort'ы angie (2 backend'а) | Сеть VM |
+|---|---|---|---|---|---|---|
+| **Low**    | 4 c / 8 ГБ, preemptible | 2 c / 4 ГБ, preemptible | 2 c / 4 ГБ, preemptible | 30085 / 30086 | 30091 / 30092 | software-accelerated |
+| **Medium** | 4 c / 8 ГБ, preemptible | 4 c / 8 ГБ, preemptible | 4 c / 8 ГБ, preemptible | 30087 / 30088 | 30093 / 30094 | software-accelerated |
+| **High**   | 4 c / 8 ГБ, preemptible | 4 c / 8 ГБ, preemptible | 4 c / 8 ГБ, preemptible | 30089 / 30090 | 30095 / 30096 | software-accelerated |
 
 Все инстансы — платформа `standard-v2`, **preemptible** (`scheduling_policy.preemptible = true`), сеть **software-accelerated** (`network_acceleration_type = "software_accelerated"`). K8s node group во всех разделах: 4 c / 8 ГБ (не меняется, т.к. нагрузка от k6 идёт через K8s).
 
